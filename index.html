@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KCM - VISOR 3 SLOTS</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -12,17 +12,16 @@
             --tg-panel: #17212b; --tg-blue: #2481cc; 
             --tg-green: #45ad5b; --tg-red: #d14e4e; --tg-text: #f5f5f5;
         }
-        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 80vh; overflow: hidden; }
-        #app { width: 100%; max-width: 400px; height: 92vh; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; }
+        /* Ajuste de altura para celulares sem mexer no layout */
+        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 100dvh; overflow: hidden; }
+        #app { width: 100%; max-width: 400px; height: 100%; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; }
         
-        /* Cabeçalho */
         .tg-header { background: var(--tg-panel); padding: 12px; display: flex; align-items: center; border-bottom: 1px solid #000; z-index: 100; }
         .tg-avatar { width: 40px; height: 40px; background: linear-gradient(135deg, #50a2e3, #2481cc); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; }
         .tg-info { flex-grow: 1; }
         .banca-header { text-align: right; }
         .banca-header b { font-size: 15px; color: #fff; display: block; }
 
-        /* Chat */
         .visor-chat { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-attachment: fixed; }
         
         .bubble { 
@@ -33,13 +32,18 @@
         .bubble-red { border-left-color: var(--tg-red); }
         .msg-time { display: block; text-align: right; font-size: 9px; opacity: 0.5; margin-top: 5px; }
 
-        /* Footer e Config */
-        .tg-footer { background: var(--tg-panel); padding: 12px; border-top: 1px solid #000; }
-        #timer-box { font-weight: bold; color: var(--tg-blue); text-align: center; font-size: 11px; margin-bottom: 8px; }
+        .tg-footer { background: var(--tg-panel); padding: 12px 12px 25px 12px; border-top: 1px solid #000; }
+        #timer-box { font-weight: bold; color: var(--tg-blue); text-align: center; font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        
+        /* Luz de Status */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; }
+        .status-online { background: var(--tg-green); box-shadow: 0 0 5px var(--tg-green); }
+        .status-offline { background: var(--tg-red); }
+
         .btn-row { display: flex; justify-content: space-around; }
         .btn-nav { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 10px; display: flex; flex-direction: column; align-items: center; }
         
-        #config-tab { display: none; position: absolute; bottom: 80px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 12px; border: 1px solid #444; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); max-height: 80vh; overflow-y: auto; }
+        #config-tab { display: none; position: absolute; bottom: 80px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 12px; border: 1px solid #444; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); max-height: 70vh; overflow-y: auto; }
         .config-row { margin-bottom: 8px; }
         .config-row label { font-size: 9px; color: var(--tg-blue); font-weight: bold; display: block; margin-bottom: 2px; text-transform: uppercase; }
         select, input { width: 100%; background: #0e1621; border: 1px solid #333; color: white; padding: 5px; border-radius: 5px; font-size: 11px; }
@@ -85,7 +89,10 @@
     </div>
 
     <div class="tg-footer">
-        <div id="timer-box">Aguardando sinais...</div>
+        <div id="timer-box">
+            <span id="status-led" class="status-dot"></span>
+            <span id="status-label">Conectando ao Robô...</span>
+        </div>
         <div class="btn-row">
             <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h" style="font-size:18px; margin-bottom:4px;"></i>AJUSTES</button>
             <button class="btn-nav" onclick="location.reload()"><i class="fas fa-sync" style="font-size:18px; margin-bottom:4px;"></i>RESET</button>
@@ -94,7 +101,6 @@
 </div>
 
 <script>
-        // --- LISTA DE ATIVOS QUE VOCÊ ENVIOU ---
     const LISTA_ATIVOS = [
         { id: "NONE", nome: "❌ DESATIVAR SLOT" },
         { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
@@ -141,8 +147,20 @@
         { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
     ];
 
-    const socket = io("https://app-fl26.onrender.com");
-    let wins = 0, reds = 0, bancaAtual = 5000, valorEntrada = 10;
+
+    // CONEXÃO COM O SEU RENDER CORRETO
+    const socket = io("https://multiplaskcmp.onrender.com");
+    let wins = 0, reds = 0, bancaAtual = 5000;
+
+    socket.on('connect', () => {
+        document.getElementById('status-led').className = 'status-dot status-online';
+        document.getElementById('status-label').innerText = "Vela em: 00s";
+    });
+
+    socket.on('disconnect', () => {
+        document.getElementById('status-led').className = 'status-dot status-offline';
+        document.getElementById('status-label').innerText = "Robô Offline...";
+    });
 
     socket.on('sinal_app', (dados) => {
         let classe = '';
@@ -150,8 +168,8 @@
         if(dados.tipo === 'RESULTADO') {
             classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
             let pay = parseFloat(document.getElementById('inpPay').value) / 100;
-            if(dados.resultado === 'WIN') { wins++; bancaAtual += (valorEntrada * pay); }
-            else { reds++; bancaAtual -= valorEntrada; }
+            if(dados.resultado === 'WIN') { wins++; bancaAtual += (10 * pay); }
+            else { reds++; bancaAtual -= 10; }
             document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
             document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
         }
@@ -177,11 +195,10 @@
         bancaAtual = parseFloat(document.getElementById('inpBanca').value);
         document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
         toggleConfig();
-        addMsg("⚙️ Configurações Salvas!\nEstratégia e Slots atualizados.", "");
+        addMsg("⚙️ Ajustes Salvos!", "");
     }
 
     window.onload = () => {
-        // Carregar a lista nos 3 slots
         [1,2,3].forEach(i => {
             const sel = document.getElementById('sel'+i);
             LISTA_ATIVOS.forEach(a => {
@@ -189,12 +206,14 @@
                 opt.value = a.id; opt.innerText = a.nome; sel.appendChild(opt);
             });
         });
-        addMsg("🤖 Sistema KCM Online!\nEscolha os ativos nos Ajustes.", "");
+        addMsg("🤖 KCM Master Iniciado!", "");
     }
 
     setInterval(() => {
-        const s = new Date().getSeconds();
-        document.getElementById('timer-box').innerText = "Analisando vela: " + (60 - s) + "s";
+        if(socket.connected) {
+            const s = new Date().getSeconds();
+            document.getElementById('status-label').innerText = "Analisando vela: " + (60 - s) + "s";
+        }
     }, 1000);
 </script>
 </body>
