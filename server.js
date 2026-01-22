@@ -8,7 +8,14 @@ const fetch = require('node-fetch');
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: "*" } });
+
+// AJUSTE AQUI: Liberando a conexão para o seu App (index.html) conseguir entrar
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
 const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI"; 
 const TG_CHAT_ID = "-1003355965894"; 
@@ -19,7 +26,6 @@ const ATIVOS = {
     "1HZ10V": "Volatility 10 (1s) Index",
     "R_100": "Volatility 100 Index",
     "1HZ100V": "Volatility 100 (1s) Index"
-    // O servidor aceita qualquer ID enviado, mas aqui definimos os nomes bonitos
 };
 
 function dispararSinal(mensagem, tipo, resultado = null) {
@@ -35,7 +41,6 @@ function dispararSinal(mensagem, tipo, resultado = null) {
 }
 
 function iniciarMotorKCM() {
-    // Monitora os ativos principais (Você pode adicionar mais IDs aqui)
     ["R_10", "1HZ10V", "R_100", "1HZ100V"].forEach(id => {
         const ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
         ws.on('open', () => ws.send(JSON.stringify({ ticks: id })));
@@ -58,7 +63,6 @@ function iniciarMotorKCM() {
                 m.velaAb = p;
             }
 
-            // Estratégia Sniper
             if (m.forca >= 90 || m.forca <= 10) {
                 executarOperacao(id, m.forca >= 90 ? "CALL" : "PUT", p, "SNIPER", 0);
             }
@@ -68,9 +72,8 @@ function iniciarMotorKCM() {
             m.opAtiva = true;
             const nome = ATIVOS[idAtivo] || idAtivo;
             
-            // CÁLCULO DE HORÁRIOS (O que você pediu)
             const tempoInicio = new Date();
-            const tempoFim = new Date(tempoInicio.getTime() + 10000); // 10 segundos depois
+            const tempoFim = new Date(tempoInicio.getTime() + 10000); 
             
             const hI = tempoInicio.toLocaleTimeString();
             const hF = tempoFim.toLocaleTimeString();
@@ -108,4 +111,7 @@ function iniciarMotorKCM() {
     });
 }
 
-server.listen(process.env.PORT || 3000, () => { iniciarMotorKCM(); });
+server.listen(process.env.PORT || 3000, () => { 
+    console.log("🚀 SERVIDOR KCM ONLINE COM CORS LIBERADO");
+    iniciarMotorKCM(); 
+});
