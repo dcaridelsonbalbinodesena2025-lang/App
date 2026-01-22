@@ -103,7 +103,7 @@
 
     <div class="tg-footer-area">
         <div class="timer-strip">
-            <div id="p-ativo" style="font-size:8px; color:#f0b90b;">🛰️ Conectado ao Render</div>
+            <div id="p-ativo" style="font-size:8px; color:#d14e4e;">🔴 Reconectando ao Render...</div>
             <div id="timer-box">00s</div>
         </div>
         <div class="btn-row">
@@ -115,31 +115,37 @@
 </div>
 
 <script>
-    // CONEXÃO COM O RENDER - REFORÇADA PARA RECEBER SINAL
+    // CONEXÃO REFORÇADA - SEM ERRO
     const socket = io("https://app-fl26.onrender.com", {
-        transports: ['websocket'],
-        reconnection: true
+        transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+        document.getElementById('p-ativo').innerText = "🟢 SISTEMA ONLINE";
+        document.getElementById('p-ativo').style.color = "#45ad5b";
+    });
+
+    socket.on('disconnect', () => {
+        document.getElementById('p-ativo').innerText = "🔴 DESCONECTADO";
+        document.getElementById('p-ativo').style.color = "#d14e4e";
     });
 
     // Variáveis Globais
-    let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0, lucro = 0;
+    let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0;
     let winsG1 = 0, winsG2 = 0;
 
-    // ESCUTA O SERVIDOR E COLOCA NA TELA
+    // RECEBE O SINAL DO SERVIDOR
     socket.on('sinal_app', (dados) => {
+        console.log("Recebi sinal:", dados);
         if(dados.tipo === 'ALERTA') {
             document.getElementById('snd-alert').play().catch(()=>{});
             analises++;
             addMsg(dados.texto, 'bubble-alert');
-        } else if(dados.tipo === 'ENTRADA') {
-            addMsg(dados.texto);
         } else if(dados.tipo === 'RESULTADO') {
             const classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
             if(dados.resultado === 'WIN') {
                 document.getElementById('snd-green').play().catch(()=>{});
                 wins++;
-                if(dados.texto.includes("GALE 1")) winsG1++;
-                else if(dados.texto.includes("GALE 2")) winsG2++;
             } else {
                 document.getElementById('snd-red').play().catch(()=>{});
                 reds++;
@@ -149,7 +155,7 @@
         }
     });
 
-    // LISTA COMPLETA PRESERVADA 100%
+    // LISTA COMPLETA 100% PRESERVADA
     const LISTA_ATIVOS = [
         { id: "NONE", nome: "❌ DESATIVAR SLOT" },
         { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
@@ -189,40 +195,21 @@
         { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
     ];
 
-    let precosAtuais = { slot1: 0, slot2: 0, slot3: 0 };
-    let derivSocket = null;
-
-    function getH() { return new Date().toLocaleTimeString().slice(0,5); }
-    
-    function conectarDeriv() {
-        if (derivSocket) derivSocket.close();
-        derivSocket = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
-        derivSocket.onopen = () => {
-            [1,2,3].forEach(i => {
-                const val = document.getElementById('sel'+i).value;
-                if(val !== "NONE") derivSocket.send(JSON.stringify({ticks: val}));
-            });
-        };
-        derivSocket.onmessage = (msg) => {
-            const data = JSON.parse(msg.data);
-            if (data.tick) {
-                const s = data.tick.symbol;
-                const v = data.tick.quote;
-                [1,2,3].forEach(i => {
-                    if(s === document.getElementById('sel'+i).value) precosAtuais['slot'+i] = v;
-                });
-                renderVisor();
-            }
-        };
+    function addMsg(txt, type = '') {
+        const chat = document.getElementById('chat');
+        const div = document.createElement('div');
+        div.className = `bubble ${type}`;
+        div.innerHTML = `${txt}<span class="msg-time">${new Date().toLocaleTimeString().slice(0,5)}</span>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
     }
 
-    function renderVisor() {
-        let txt = "";
-        [1,2,3].forEach(i => {
-            const sel = document.getElementById('sel'+i);
-            if(sel.value !== "NONE") txt += sel.selectedOptions[0].innerText.split(' (')[0] + ": " + precosAtuais['slot'+i] + " | ";
-        });
-        document.getElementById('p-ativo').innerText = txt || "🛰️ Conectado ao Render";
+    function toggleConfig() {
+        const t = document.getElementById('config-tab');
+        if (t.style.display === 'block') {
+            t.style.display = 'none';
+            socket.emit('mudar_estrategia', document.getElementById('selEstrategia').value);
+        } else { t.style.display = 'block'; }
     }
 
     function init() {
@@ -233,69 +220,12 @@
                 opt.value = a.id; opt.innerText = a.nome; s.appendChild(opt);
             });
         });
-        conectarDeriv();
-    }
-
-    function addMsg(txt, type = '') {
-        const chat = document.getElementById('chat');
-        const div = document.createElement('div');
-        div.className = `bubble ${type}`;
-        div.innerHTML = `${txt}<span class="msg-time">${getH()}</span>`;
-        chat.appendChild(div);
-        chat.scrollTop = chat.scrollHeight;
-    }
-
-    function toggleConfig() {
-        const t = document.getElementById('config-tab');
-        if (t.style.display === 'block') {
-            t.style.display = 'none';
-            bancaInicial = parseFloat(document.getElementById('inpBanca').value);
-            bancaAtual = bancaInicial;
-            document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
-            conectarDeriv();
-            // Avisa ao servidor que o app está ativo
-            socket.emit('ready');
-        } else { t.style.display = 'block'; }
     }
 
     setInterval(() => {
         const s = new Date().getSeconds();
         document.getElementById('timer-box').innerText = (60-s).toString().padStart(2, '0') + "s";
     }, 1000);
-
-    function enviarRelatorio() {
-        const total = wins + reds;
-        const wr = total > 0 ? ((wins / total) * 100).toFixed(0) : 0;
-        const lucroTotal = bancaAtual - bancaInicial;
-        const cresc = bancaInicial > 0 ? ((lucroTotal / bancaInicial) * 100).toFixed(2) : 0;
-        const estAtiva = document.getElementById('selEstrategia').value;
-
-        const relatorioFormatado = `🗓<b>Relatório KCM MASTER</b>\n\n` +
-            `🔎 Número de Análises: ${analises.toString().padStart(2, '0')}\n` +
-            `✋ Análises abortadas: ${abortadas.toString().padStart(2, '0')}\n` +
-            `♻️ win c/gale 1: ${winsG1.toString().padStart(2, '0')}\n` +
-            `♻️ win c/gale 2: ${winsG2.toString().padStart(2, '0')}\n` +
-            `🤑 Total geral Green: ${wins.toString().padStart(2, '0')}\n` +
-            `😡 Total geral Loos: ${reds.toString().padStart(2, '0')}\n\n` +
-            `🏆 Rank de ativos\n` +
-            `1° Lugar: ${estAtiva} / ${wr}%\n` +
-            `2° Lugar: -- / 00%\n` +
-            `3° Lugar: -- / 00%\n\n` +
-            `📈 Eficiência do bot: ${wr}%\n` +
-            `✅ Assertividade: ${wr}%\n` +
-            `💰 Banca inicial: ${bancaInicial.toFixed(2)}R$\n` +
-            `🤑 Lucro: ${lucroTotal.toFixed(2)}R$\n` +
-            `📊 Crescimento de: ${cresc}%`;
-
-        addMsg(relatorioFormatado);
-    }
-
-    function gerarPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.text("RELATORIO KCM MASTER", 10, 10);
-        doc.save("Relatorio_KCM.pdf");
-    }
 
     window.onload = init;
 </script>
