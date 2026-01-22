@@ -115,12 +115,16 @@
 </div>
 
 <script>
-    // --- CONEXÃO COM O SERVIDOR DO RENDER ---
     const socket = io("https://app-fl26.onrender.com");
+
+    // Variáveis Globais
+    let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0, lucro = 0;
+    let winsG1 = 0, winsG2 = 0;
 
     socket.on('sinal_app', (dados) => {
         if(dados.tipo === 'ALERTA') {
             document.getElementById('snd-alert').play().catch(()=>{});
+            analises++;
             addMsg(dados.texto, 'bubble-alert');
         } else if(dados.tipo === 'ENTRADA') {
             addMsg(dados.texto);
@@ -129,6 +133,9 @@
             if(dados.resultado === 'WIN') {
                 document.getElementById('snd-green').play().catch(()=>{});
                 wins++;
+                // Lógica simples para simular Gale no relatório vindo do servidor
+                if(dados.texto.includes("GALE 1")) winsG1++;
+                else if(dados.texto.includes("GALE 2")) winsG2++;
             } else {
                 document.getElementById('snd-red').play().catch(()=>{});
                 reds++;
@@ -177,7 +184,6 @@
         { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
     ];
 
-    let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0, lucro = 0;
     let precosAtuais = { slot1: 0, slot2: 0, slot3: 0 };
     let derivSocket = null;
 
@@ -211,7 +217,7 @@
             const sel = document.getElementById('sel'+i);
             if(sel.value !== "NONE") txt += sel.selectedOptions[0].innerText.split(' (')[0] + ": " + precosAtuais['slot'+i] + " | ";
         });
-        document.getElementById('p-ativo').innerText = txt || "🛰️ Aguardando Sinais do Render...";
+        document.getElementById('p-ativo').innerText = txt || "🛰️ Conectado ao Render";
     }
 
     function init() {
@@ -223,7 +229,6 @@
             });
         });
         conectarDeriv();
-        addMsg("💎 <b>SISTEMA KCM CONECTADO</b>\nOuvindo sinais do Telegram via Render...");
     }
 
     function addMsg(txt, type = '') {
@@ -239,6 +244,10 @@
         const t = document.getElementById('config-tab');
         if (t.style.display === 'block') {
             t.style.display = 'none';
+            // Atualiza banca ao fechar ajustes
+            bancaInicial = parseFloat(document.getElementById('inpBanca').value);
+            bancaAtual = bancaInicial;
+            document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
             conectarDeriv();
         } else { t.style.display = 'block'; }
     }
@@ -248,16 +257,38 @@
         document.getElementById('timer-box').innerText = (60-s).toString().padStart(2, '0') + "s";
     }, 1000);
 
+    // FUNÇÃO DO RELATÓRIO IDÊNTICA À IMAGEM
     function enviarRelatorio() {
         const total = wins + reds;
         const wr = total > 0 ? ((wins / total) * 100).toFixed(0) : 0;
-        addMsg(`🗓<b>Relatório KCM MASTER</b>\n\n🔎Análises Recebidas: ${total}\n🤑Total Green: ${wins}\n😡Total Loos: ${reds}\n\n📈Eficiência: ${wr}%`);
+        const lucroTotal = bancaAtual - bancaInicial;
+        const cresc = bancaInicial > 0 ? ((lucroTotal / bancaInicial) * 100).toFixed(2) : 0;
+        const estAtiva = document.getElementById('selEstrategia').value;
+
+        const relatorioFormatado = `🗓<b>Relatório KCM MASTER</b>\n\n` +
+            `🔎 Número de Análises: ${analises.toString().padStart(2, '0')}\n` +
+            `✋ Análises abortadas: ${abortadas.toString().padStart(2, '0')}\n` +
+            `♻️ win c/gale 1: ${winsG1.toString().padStart(2, '0')}\n` +
+            `♻️ win c/gale 2: ${winsG2.toString().padStart(2, '0')}\n` +
+            `🤑 Total geral Green: ${wins.toString().padStart(2, '0')}\n` +
+            `😡 Total geral Loos: ${reds.toString().padStart(2, '0')}\n\n` +
+            `🏆 Rank de ativos\n` +
+            `1° Lugar: ${estAtiva} / ${wr}%\n` +
+            `2° Lugar: -- / 00%\n` +
+            `3° Lugar: -- / 00%\n\n` +
+            `📈 Eficiência do bot: ${wr}%\n` +
+            `✅ Assertividade: ${wr}%\n` +
+            `💰 Banca inicial: ${bancaInicial.toFixed(2)}R$\n` +
+            `🤑 Lucro: ${lucroTotal.toFixed(2)}R$\n` +
+            `📊 Crescimento de: ${cresc}%`;
+
+        addMsg(relatorioFormatado);
     }
 
     function gerarPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        doc.text("RELATORIO KCM SUPREMO", 10, 10);
+        doc.text("RELATORIO KCM MASTER", 10, 10);
         doc.save("Relatorio_KCM.pdf");
     }
 
@@ -265,3 +296,4 @@
 </script>
 </body>
 </html>
+
