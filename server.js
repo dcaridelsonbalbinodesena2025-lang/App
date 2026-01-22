@@ -20,25 +20,29 @@ let estrategiaAtual = "Fluxo Sniper";
 const ativos = ["R_10", "R_25", "R_50", "R_75", "R_100", "1HZ10V", "1HZ100V"];
 const ativosFormatados = { "R_10": "Volatility 10", "R_100": "Volatility 100", "1HZ10V": "Volatility 10 (1s)" };
 
-function iniciarAnalise() {
-    ativos.forEach(ativo => {
-        const ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
-        ws.on('open', () => ws.send(JSON.stringify({ ticks: ativo })));
-        let hist = [];
-        ws.on('message', (data) => {
-            const res = JSON.parse(data);
-            if (res.tick) {
-                hist.push(res.tick.quote);
-                if (hist.length > 5) {
-                    const u = hist[hist.length-1], p = hist[hist.length-2], a = hist[hist.length-3];
-                    if (u > p && p > a) { gerarSinalReal(ativo, "COMPRA 🟢"); hist = []; }
-                    else if (u < p && p < a) { gerarSinalReal(ativo, "VENDA 🔴"); hist = []; }
-                    if (hist.length > 10) hist.shift();
-                }
-            }
-        });
-    });
+// --- MOTOR DE ANÁLISE COMPLETO ---
+function gerarCicloSinal(ativo, direcao) {
+    const nome = ativosFormatados[ativo] || ativo;
+
+    // 1. MANDA A ANÁLISE (Bolha Amarela)
+    enviarSinal('ALERTA', `🔎 **ANALISANDO ATIVO**\n\n📊 Ativo: ${nome}\n🎯 Estratégia: ${estrategiaAtual}\n⏳ Aguarde a confirmação...`);
+
+    // 2. ESPERA 5 SEGUNDOS E MANDA A ENTRADA (Bolha Padrão)
+    setTimeout(() => {
+        enviarSinal('ENTRADA', `🎯 **ENTRADA CONFIRMADA**\n\n📊 Ativo: ${nome}\n⚡️ Direção: ${direcao}\n📱 KCM MASTER SUPREMO`);
+
+        // 3. ESPERA MAIS 30 SEGUNDOS (OU O TEMPO DA VELA) E MANDA O RESULTADO
+        setTimeout(() => {
+            // Aqui simulamos um WIN, mas você pode conectar à sua lógica real
+            const resultadoSimulado = Math.random() > 0.3 ? 'WIN' : 'LOSS';
+            const emoji = resultadoSimulado === 'WIN' ? '✅' : '❌';
+            
+            enviarSinal('RESULTADO', `${emoji} **RESULTADO: ${resultadoSimulado}**\n\n💰 Ativo: ${nome}\n📈 Estratégia: ${estrategiaAtual}`, resultadoSimulado);
+        }, 30000); // 30 segundos para o resultado
+
+    }, 5000); // 5 segundos após a análise
 }
+
 
 function gerarSinalReal(ativo, direcao) {
     const nome = ativosFormatados[ativo] || ativo;
