@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KCM - VISOR OPERACIONAL SUPREMO</title>
+    <title>KCM - VISOR 3 SLOTS</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -12,43 +12,25 @@
             --tg-panel: #17212b; --tg-blue: #2481cc; 
             --tg-green: #45ad5b; --tg-red: #d14e4e; --tg-text: #f5f5f5;
         }
-        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 90vh; overflow: hidden; }
-        #app { width: 100%; max-width: 400px; height: 90vh; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; }
+        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 100vh; overflow: hidden; }
+        #app { width: 100%; max-width: 400px; height: 100vh; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; }
         
         /* Cabeçalho */
         .tg-header { background: var(--tg-panel); padding: 12px; display: flex; align-items: center; border-bottom: 1px solid #000; z-index: 100; }
         .tg-avatar { width: 40px; height: 40px; background: linear-gradient(135deg, #50a2e3, #2481cc); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; }
         .tg-info { flex-grow: 1; }
         .banca-header { text-align: right; }
-        .banca-header small { color: var(--tg-blue); font-size: 9px; font-weight: bold; text-transform: uppercase; }
         .banca-header b { font-size: 15px; color: #fff; display: block; }
 
         /* Chat */
         .visor-chat { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-attachment: fixed; }
         
         .bubble { 
-            max-width: 85%; 
-            padding: 12px; 
-            border-radius: 12px; 
-            margin-bottom: 12px; 
-            font-size: 13px; 
-            line-height: 1.5; 
-            color: white; 
-            align-self: flex-start; 
-            background: var(--tg-panel); 
-            border-bottom-left-radius: 2px; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.4); 
-            white-space: pre-wrap; /* Mantém as quebras de linha enviadas pelo robô */
-            word-wrap: break-word;
-            border-left: 4px solid transparent;
-            animation: slideIn 0.3s ease;
+            max-width: 85%; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; color: white; align-self: flex-start; background: var(--tg-panel); border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.4); white-space: pre-wrap; word-wrap: break-word; border-left: 4px solid transparent;
         }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
         .bubble-alert { border-left-color: #f0b90b; }
         .bubble-green { border-left-color: var(--tg-green); }
         .bubble-red { border-left-color: var(--tg-red); }
-        
         .msg-time { display: block; text-align: right; font-size: 9px; opacity: 0.5; margin-top: 5px; }
 
         /* Footer e Config */
@@ -57,10 +39,10 @@
         .btn-row { display: flex; justify-content: space-around; }
         .btn-nav { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 10px; display: flex; flex-direction: column; align-items: center; }
         
-        #config-tab { display: none; position: absolute; bottom: 80px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 12px; border: 1px solid #444; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); }
-        .config-row { margin-bottom: 10px; }
-        .config-row label { font-size: 10px; color: var(--tg-blue); font-weight: bold; display: block; margin-bottom: 3px; }
-        select, input { width: 100%; background: #0e1621; border: 1px solid #333; color: white; padding: 6px; border-radius: 5px; font-size: 11px; }
+        #config-tab { display: none; position: absolute; bottom: 80px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 12px; border: 1px solid #444; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); max-height: 80vh; overflow-y: auto; }
+        .config-row { margin-bottom: 8px; }
+        .config-row label { font-size: 9px; color: var(--tg-blue); font-weight: bold; display: block; margin-bottom: 2px; text-transform: uppercase; }
+        select, input { width: 100%; background: #0e1621; border: 1px solid #333; color: white; padding: 5px; border-radius: 5px; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -73,7 +55,7 @@
             <div style="font-size: 10px; color: #8b949e;" id="placar-txt">✅ 0 | ❌ 0</div>
         </div>
         <div class="banca-header">
-            <small>Saldo App</small>
+            <small style="font-size: 8px; color: var(--tg-blue);">SALDO APP</small>
             <b id="banca-topo">R$ 5000.00</b>
         </div>
     </div>
@@ -82,33 +64,37 @@
 
     <div id="config-tab">
         <div class="config-row">
-            <label>SELECIONAR ATIVO (SLOT 1)</label>
-            <select id="selAtivo"></select>
+            <label>Estratégia Operacional</label>
+            <select id="selEstrategia">
+                <option value="Fluxo Sniper">🎯 Fluxo Sniper</option>
+                <option value="Regra 1">⚖️ Regra 1</option>
+                <option value="Zig Zag">📉 Zig Zag</option>
+                <option value="Sniper Retração">🏹 Sniper Retração</option>
+            </select>
         </div>
-        <div style="display: flex; gap: 10px;">
-            <div class="config-row" style="flex:1">
-                <label>BANCA R$</label>
-                <input type="number" id="inpBanca" value="5000">
-            </div>
-            <div class="config-row" style="flex:1">
-                <label>PAYOUT %</label>
-                <input type="number" id="inpPay" value="95">
-            </div>
+        <hr style="border: 0; border-top: 1px solid #333; margin: 10px 0;">
+        <div class="config-row"><label>Ativo Slot 1</label><select id="sel1"></select></div>
+        <div class="config-row"><label>Ativo Slot 2</label><select id="sel2"></select></div>
+        <div class="config-row"><label>Ativo Slot 3</label><select id="sel3"></select></div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <div class="config-row" style="flex:1"><label>Banca R$</label><input type="number" id="inpBanca" value="5000"></div>
+            <div class="config-row" style="flex:1"><label>Payout %</label><input type="number" id="inpPay" value="95"></div>
         </div>
-        <button onclick="salvarConfig()" style="width:100%; padding:10px; background:var(--tg-blue); color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">SALVAR E APLICAR</button>
+        <button onclick="salvarConfig()" style="width:100%; padding:10px; background:var(--tg-blue); color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin-top: 10px;">SALVAR CONFIGURAÇÕES</button>
     </div>
 
     <div class="tg-footer">
         <div id="timer-box">Aguardando sinais...</div>
         <div class="btn-row">
-            <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-cog" style="font-size:18px; margin-bottom:4px;"></i>AJUSTES</button>
+            <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h" style="font-size:18px; margin-bottom:4px;"></i>AJUSTES</button>
             <button class="btn-nav" onclick="location.reload()"><i class="fas fa-sync" style="font-size:18px; margin-bottom:4px;"></i>RESET</button>
         </div>
     </div>
 </div>
 
 <script>
-    // --- LISTA DE ATIVOS QUE VOCÊ ENVIOU ---
+        // --- LISTA DE ATIVOS QUE VOCÊ ENVIOU ---
     const LISTA_ATIVOS = [
         { id: "NONE", nome: "❌ DESATIVAR SLOT" },
         { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
@@ -152,12 +138,10 @@
         { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP/USD)" },
         { id: "cryBCHUSD", nome: "₿ BITCOIN CASH (BCH/USD)" },
         { id: "cryEOSUSD", nome: "🌐 EOS (EOS/USD)" },
-        { id: "cryDSHUSD", nome: "💨 DASH (DASH/USD)" }
+        { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
     ];
 
-    // LINK DO SEU RENDER
     const socket = io("https://app-fl26.onrender.com");
-
     let wins = 0, reds = 0, bancaAtual = 5000, valorEntrada = 10;
 
     socket.on('sinal_app', (dados) => {
@@ -165,16 +149,9 @@
         if(dados.tipo === 'ALERTA') classe = 'bubble-alert';
         if(dados.tipo === 'RESULTADO') {
             classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
-            
-            // Lógica de Saldo
             let pay = parseFloat(document.getElementById('inpPay').value) / 100;
-            if(dados.resultado === 'WIN') {
-                wins++;
-                bancaAtual += (valorEntrada * pay);
-            } else {
-                reds++;
-                bancaAtual -= valorEntrada;
-            }
+            if(dados.resultado === 'WIN') { wins++; bancaAtual += (valorEntrada * pay); }
+            else { reds++; bancaAtual -= valorEntrada; }
             document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
             document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
         }
@@ -185,10 +162,8 @@
         const chat = document.getElementById('chat');
         const div = document.createElement('div');
         div.className = `bubble ${classe}`;
-        const hora = new Date().toLocaleTimeString().slice(0,5);
-        
-        // Transformar as quebras de linha em <br> para o HTML
-        div.innerHTML = `${txt.replace(/\n/g, '<br>')}<span class="msg-time">${hora}</span>`;
+        const h = new Date().toLocaleTimeString().slice(0,5);
+        div.innerHTML = `${txt.replace(/\n/g, '<br>')}<span class="msg-time">${h}</span>`;
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
     }
@@ -202,22 +177,24 @@
         bancaAtual = parseFloat(document.getElementById('inpBanca').value);
         document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
         toggleConfig();
-        addMsg("⚙️ Configurações aplicadas com sucesso!", "");
+        addMsg("⚙️ Configurações Salvas!\nEstratégia e Slots atualizados.", "");
     }
 
-    // Inicializar lista de ativos no select
     window.onload = () => {
-        const sel = document.getElementById('selAtivo');
-        LISTA_ATIVOS.forEach(a => {
-            let opt = document.createElement('option');
-            opt.value = a.id; opt.innerText = a.nome; sel.appendChild(opt);
+        // Carregar a lista nos 3 slots
+        [1,2,3].forEach(i => {
+            const sel = document.getElementById('sel'+i);
+            LISTA_ATIVOS.forEach(a => {
+                let opt = document.createElement('option');
+                opt.value = a.id; opt.innerText = a.nome; sel.appendChild(opt);
+            });
         });
-        addMsg("🤖 Sistema KCM Online!\nAguardando sinais do mercado...", "");
+        addMsg("🤖 Sistema KCM Online!\nEscolha os ativos nos Ajustes.", "");
     }
 
     setInterval(() => {
         const s = new Date().getSeconds();
-        document.getElementById('timer-box').innerText = "Vela em: " + (60 - s) + "s";
+        document.getElementById('timer-box').innerText = "Analisando vela: " + (60 - s) + "s";
     }, 1000);
 </script>
 </body>
