@@ -1,7 +1,7 @@
 {
-  "name": "app-kcm",
+  "name": "app-kcm-completo",
   "version": "1.0.0",
-  "description": "Servidor KCM",
+  "description": "Servidor KCM com Telegram e Visor HTML",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +9,8 @@
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2",
+    "ws": "^8.11.0",
+    "cors": "^2.8.5",
     "telegraf": "^4.12.0"
   }
 }
