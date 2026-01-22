@@ -6,56 +6,47 @@ const http = require('http');
 const socketIo = require('socket.io');
 
 const app = express();
-app.use(express.json());
 app.use(cors());
-
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: "*" } });
 
-// --- CONFIGURAÇÕES DO SEU BOT ---
+// Configurações extraídas das suas fotos
 const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI";
 const TG_CHAT_ID = "-1003355965894";
 
-// --- VARIÁVEIS DE CONTROLE ---
-let bancaInicial = 15000;
-let bancaAtual = 15000;
-let stats = { winDireto: 0, winG1: 0, winG2: 0, loss: 0 };
+let estrategiaAtual = "Fluxo Sniper"; // Padrão inicial
 
-app.get('/', (req, res) => {
-    res.send('<h1>🚀 Servidor KCM MASTER Ativo!</h1>');
-});
+app.get('/', (req, res) => { res.send('🚀 KCM MASTER Operacional!'); });
 
-// --- FUNÇÃO QUE ENVIA PARA O TELEGRAM E PARA O APP AO MESMO TEMPO ---
-async function enviarSinal(tipo, texto, resultado = null) {
-    // 1. Envia para o Telegram
-    try {
-        await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: TG_CHAT_ID, text: texto, parse_mode: 'Markdown' })
-        });
-    } catch (e) { console.error("Erro Telegram:", e); }
-
-    // 2. Envia para o seu App (O que faz aparecer na tela azul)
-    io.emit('sinal_app', {
-        tipo: tipo,
-        texto: texto,
-        resultado: resultado
-    });
+// --- FUNÇÃO PARA ENVIAR SINAIS REAIS ---
+function enviarSinal(tipo, texto, resultado = null) {
+    // Envia para o App (Sua tela azul)
+    io.emit('sinal_app', { tipo, texto, resultado });
+    
+    // Envia para o Telegram
+    fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TG_CHAT_ID, text: texto, parse_mode: 'Markdown' })
+    }).catch(e => console.log("Erro TG:", e));
 }
 
-// --- LOGICA DAS ESTRATÉGIAS (Sua parte complexa resumida para estabilidade) ---
-// Aqui você pode inserir suas funções de análise Sniper/Fluxo.
-// Sempre que a análise der GREEN, chame: enviarSinal('RESULTADO', '✅ GREEN!', 'WIN');
-
+// --- ESCUTANDO MUDANÇAS DO APP ---
 io.on('connection', (socket) => {
-    console.log("App de R$ 15.000 conectado!"); //
-    // Sinal de boas-vindas para confirmar que funcionou
-    socket.emit('sinal_app', {
-        tipo: 'ALERTA',
-        texto: "🚀 **SISTEMA RESTAURADO**\n\nMonitorando Sniper e Fluxo com banca de R$ 15.000,00."
+    console.log("App conectado!");
+    
+    // Escuta quando você muda a estratégia no menu Ajustes
+    socket.on('mudar_estrategia', (novaEstrategia) => {
+        estrategiaAtual = novaEstrategia;
+        console.log("Estratégia alterada para: " + estrategiaAtual);
+        enviarSinal('ALERTA', `🔄 **ESTRATÉGIA ALTERADA**\n\nO bot agora está operando com: ${estrategiaAtual}`);
     });
 });
+
+// --- AQUI ENTRA SUA LÓGICA COMPLEXA DE ANÁLISE ---
+// (Insira aqui o seu motor de WebSocket da Deriv que faz as análises)
+// Exemplo de como ele deve enviar o sinal agora:
+// if (oportunidade) { enviarSinal('ALERTA', '🎯 ENTRADA CONFIRMADA!'); }
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
