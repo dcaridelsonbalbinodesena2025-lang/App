@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KCM - TELEGRAM SUPREMO</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { 
@@ -102,7 +103,7 @@
 
     <div class="tg-footer-area">
         <div class="timer-strip">
-            <div id="p-ativo" style="font-size:8px; color:#f0b90b;">💰 Analisador Inteligente</div>
+            <div id="p-ativo" style="font-size:8px; color:#f0b90b;">🛰️ Conectado ao Render</div>
             <div id="timer-box">00s</div>
         </div>
         <div class="btn-row">
@@ -114,38 +115,74 @@
 </div>
 
 <script>
+    // --- CONEXÃO COM O SERVIDOR DO RENDER ---
+    const socket = io("https://app-fl26.onrender.com");
+
+    socket.on('sinal_app', (dados) => {
+        if(dados.tipo === 'ALERTA') {
+            document.getElementById('snd-alert').play().catch(()=>{});
+            addMsg(dados.texto, 'bubble-alert');
+        } else if(dados.tipo === 'ENTRADA') {
+            addMsg(dados.texto);
+        } else if(dados.tipo === 'RESULTADO') {
+            const classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
+            if(dados.resultado === 'WIN') {
+                document.getElementById('snd-green').play().catch(()=>{});
+                wins++;
+            } else {
+                document.getElementById('snd-red').play().catch(()=>{});
+                reds++;
+            }
+            addMsg(dados.texto, classe);
+            document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
+        }
+    });
+
     const LISTA_ATIVOS = [
         { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+        { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
+        { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
+        { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
+        { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
+        { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
         { id: "R_10", nome: "📊 Volatility 10" },
         { id: "R_25", nome: "📊 Volatility 25" },
         { id: "R_50", nome: "📊 Volatility 50" },
         { id: "R_75", nome: "📊 Volatility 75" },
         { id: "R_100", nome: "📊 Volatility 100" },
+        { id: "JD10", nome: "🚀 Jump 10" },
+        { id: "JD25", nome: "🚀 Jump 25" },
+        { id: "JD50", nome: "🚀 Jump 50" },
+        { id: "JD75", nome: "🚀 Jump 75" },
+        { id: "JD100", nome: "🚀 Jump 100" },
+        { id: "BOOM300", nome: "💥 Boom 300" },
+        { id: "BOOM500", nome: "💥 Boom 500" },
         { id: "BOOM1000", nome: "💥 Boom 1000" },
+        { id: "CRASH300", nome: "📉 Crash 300" },
+        { id: "CRASH500", nome: "📉 Crash 500" },
         { id: "CRASH1000", nome: "📉 Crash 1000" },
+        { id: "ST50", nome: "🎢 Step Index" },
         { id: "frxEURUSD", nome: "💱 EUR/USD (Euro/Dólar)" },
-        { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" }
+        { id: "frxGBPUSD", nome: "💱 GBP/USD (Libra/Dólar)" },
+        { id: "frxUSDJPY", nome: "💱 USD/JPY (Dólar/Iene)" },
+        { id: "frxAUDUSD", nome: "💱 AUD/USD (Dólar Aus./Dólar)" },
+        { id: "frxUSDCAD", nome: "💱 USD/CAD (Dólar/Dólar Can.)" },
+        { id: "frxUSDCHF", nome: "💱 USD/CHF (Dólar/Franco Suíço)" },
+        { id: "frxEURGBP", nome: "💱 EUR/GBP (Euro/Libra)" },
+        { id: "frxEURJPY", nome: "💱 EUR/JPY (Euro/Iene)" },
+        { id: "frxGBPJPY", nome: "💱 GBP/JPY (Libra/Iene)" },
+        { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
+        { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
+        { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
+        { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
     ];
 
     let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0, lucro = 0;
-    let winsG1 = 0, winsG2 = 0;
-    
-    // Status individual por slot para permitir análise simultânea
-    let statusSlots = {
-        1: { operando: false, sinal: "", precoRef: 0 },
-        2: { operando: false, sinal: "", precoRef: 0 },
-        3: { operando: false, sinal: "", precoRef: 0 }
-    };
-
     let precosAtuais = { slot1: 0, slot2: 0, slot3: 0 };
     let derivSocket = null;
 
     function getH() { return new Date().toLocaleTimeString().slice(0,5); }
-    function getFut(min) {
-        let d = new Date(); d.setMinutes(d.getMinutes() + min);
-        return d.toLocaleTimeString().slice(0,5);
-    }
-
+    
     function conectarDeriv() {
         if (derivSocket) derivSocket.close();
         derivSocket = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
@@ -172,9 +209,9 @@
         let txt = "";
         [1,2,3].forEach(i => {
             const sel = document.getElementById('sel'+i);
-            if(sel.value !== "NONE") txt += sel.selectedOptions[0].innerText.split('(')[0] + ": " + precosAtuais['slot'+i] + " | ";
+            if(sel.value !== "NONE") txt += sel.selectedOptions[0].innerText.split(' (')[0] + ": " + precosAtuais['slot'+i] + " | ";
         });
-        document.getElementById('p-ativo').innerText = txt || "💰 Analisador Inteligente";
+        document.getElementById('p-ativo').innerText = txt || "🛰️ Aguardando Sinais do Render...";
     }
 
     function init() {
@@ -186,6 +223,7 @@
             });
         });
         conectarDeriv();
+        addMsg("💎 <b>SISTEMA KCM CONECTADO</b>\nOuvindo sinais do Telegram via Render...");
     }
 
     function addMsg(txt, type = '') {
@@ -207,75 +245,20 @@
 
     setInterval(() => {
         const s = new Date().getSeconds();
-        const est = document.getElementById('selEstrategia').value;
         document.getElementById('timer-box').innerText = (60-s).toString().padStart(2, '0') + "s";
-
-        // Segundo 55: Analisa TODOS os slots ao mesmo tempo
-        if(s === 55) {
-            [1,2,3].forEach(i => {
-                const sel = document.getElementById('sel'+i);
-                if(sel.value !== "NONE" && !statusSlots[i].operando) {
-                    statusSlots[i].operando = true;
-                    statusSlots[i].sinal = Math.random() > 0.5 ? "🟢 COMPRA" : "🔴 VENDA";
-                    statusSlots[i].precoRef = precosAtuais['slot'+i];
-                    analises++;
-                    document.getElementById('snd-alert').play().catch(()=>{});
-                    addMsg(`🚨 <b>ALERTA DE ANALISE</b>\n\n📊 Ativo: ${sel.selectedOptions[0].innerText}\n🧠 Estratégia: ${est}\n〽️ Direção: ${statusSlots[i].sinal}\n⏰ Possível Horário: ${getFut(1)}\n✅ Placar: ${wins}x${reds}`, 'bubble-alert');
-                }
-            });
-        }
-
-        // Segundo 00: Confirmação de entrada
-        if(s === 0) {
-            [1,2,3].forEach(i => {
-                if(statusSlots[i].operando) {
-                    const sel = document.getElementById('sel'+i);
-                    addMsg(`🚀 <b>ENTRADA CONFIRMADA!</b>\n\n📊 Ativo: ${sel.selectedOptions[0].innerText}\n🧠 Estratégia: ${est}\n〽️ Direção: ${statusSlots[i].sinal}\n⏰ Início Op: ${getH()}\n⌛ Fim da Op: ${getFut(1)}\n✅ Placar: ${wins}x${reds}`);
-                }
-            });
-        }
-
-        // Segundo 15: Resultado Real
-        if(s === 15) {
-            [1,2,3].forEach(i => {
-                if(statusSlots[i].operando) {
-                    const sel = document.getElementById('sel'+i);
-                    const pFinal = precosAtuais['slot'+i];
-                    const pInicial = statusSlots[i].precoRef;
-                    const sinal = statusSlots[i].sinal;
-                    const pay = parseFloat(document.getElementById('inpPay').value) / 100;
-
-                    let win = (sinal === "🟢 COMPRA" && pFinal > pInicial) || (sinal === "🔴 VENDA" && pFinal < pInicial);
-                    
-                    if(win) {
-                        wins++; lucro += (bancaInicial * 0.01 * pay); bancaAtual += (bancaInicial * 0.01 * pay);
-                        document.getElementById('snd-green').play().catch(()=>{});
-                        addMsg(`🤑 <b>GREEN DIRETO! ✅</b>\n\n📊 Ativo: ${sel.selectedOptions[0].innerText}\n🧠 Estratégia: ${est}\n〽️ Direção: ${sinal}\n⏰ Fim da Op: ${getH()}\n✅ Placar: ${wins}x${reds}`, 'bubble-green');
-                    } else {
-                        reds++; bancaAtual -= (bancaInicial * 0.01);
-                        document.getElementById('snd-red').play().catch(()=>{});
-                        addMsg(`😡 <b>LOSS REGISTRADO ❌</b>\n\n📊 Ativo: ${sel.selectedOptions[0].innerText}\n🧠 Estratégia: ${est}\n〽️ Direção: ${sinal}\n⏰ Fim da Op: ${getH()}\n❌ Placar: ${wins}x${reds}`, 'bubble-red');
-                    }
-                    statusSlots[i].operando = false;
-                }
-            });
-            document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
-            document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
-        }
     }, 1000);
 
     function enviarRelatorio() {
         const total = wins + reds;
         const wr = total > 0 ? ((wins / total) * 100).toFixed(0) : 0;
-        const cresc = ((lucro / bancaInicial) * 100).toFixed(2);
-        addMsg(`🗓<b>Relatório KCM MASTER</b>\n\n🔎Número de Análises: ${analises.toString().padStart(2,'0')}\n✋️Análises abortadas: ${abortadas.toString().padStart(2,'0')}\n♻️win c/gale 1: ${winsG1.toString().padStart(2,'0')}\n♻️win c/gale 2: ${winsG2.toString().padStart(2,'0')}\n🤑Total geral Green: ${wins.toString().padStart(2,'0')}\n😡Total geral Loos: ${reds.toString().padStart(2,'0')}\n\n🏆Rank de ativos\n1° Lugar: ${document.getElementById('selEstrategia').value} / ${wr}%\n\n📈Eficiência do bot: ${wr}%\n✅️Assertividade: ${wr}%\n💰Banca inicial: ${bancaInicial.toFixed(2)}R$\n🤑Lucro: ${lucro.toFixed(2)}R$\n📊Crecimento de: ${cresc}%`);
+        addMsg(`🗓<b>Relatório KCM MASTER</b>\n\n🔎Análises Recebidas: ${total}\n🤑Total Green: ${wins}\n😡Total Loos: ${reds}\n\n📈Eficiência: ${wr}%`);
     }
 
     function gerarPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.text("RELATORIO KCM SUPREMO", 10, 10);
-        doc.save("Relatorio.pdf");
+        doc.save("Relatorio_KCM.pdf");
     }
 
     window.onload = init;
