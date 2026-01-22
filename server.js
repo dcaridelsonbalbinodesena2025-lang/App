@@ -3,13 +3,41 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const fetch = require('node-fetch');
 
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: "*" } });
 
+// --- CONFIGURAÇÕES DO TELEGRAM ---
+const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI"; 
+const TG_CHAT_ID = "-1003355965894"; 
+
 const ATIVOS = { "R_10": "Volatility 10 Index", "1HZ10V": "Volatility 10 (1s) Index" };
+
+// Função para enviar para os dois lugares
+function dispararSinal(mensagem, tipo, resultado = null) {
+    // 1. Enviar para o Visor HTML
+    io.emit('sinal_app', { 
+        tipo: tipo, 
+        texto: mensagem,
+        resultado: resultado
+    });
+
+    // 2. Enviar para o Telegram
+    const payload = { 
+        chat_id: TG_CHAT_ID, 
+        text: mensagem, 
+        parse_mode: "Markdown" 
+    };
+    
+    fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).catch(e => console.log("Erro Telegram:", e.message));
+}
 
 function iniciarMotorReal() {
     Object.keys(ATIVOS).forEach(id => {
@@ -27,7 +55,6 @@ function iniciarMotorReal() {
             historico.push(precoAtual);
             if (historico.length > 10) historico.shift();
 
-            // ESTRATÉGIA: 3 Ticks de força
             if (historico.length >= 4) {
                 const u = historico[historico.length - 1];
                 const p = historico[historico.length - 2];
@@ -47,17 +74,11 @@ function iniciarMotorReal() {
 
 function executarOperacaoReal(idAtivo, direcao, taxaEntrada) {
     const nome = ATIVOS[idAtivo];
-    const tempoExpiracao = 10000; // 10 Segundos para checar o resultado real
+    const msgEntrada = `🎯 **ENTRADA CONFIRMADA**\n\n📊 Ativo: ${nome}\n🎯 Direção: ${direcao === "CALL" ? "COMPRA 🟢" : "VENDA 🔴"}\n📈 Taxa: ${taxaEntrada}`;
 
-    // 1. MANDA A ENTRADA
-    io.emit('sinal_app', { 
-        tipo: 'ENTRADA', 
-        texto: `🎯 **ENTRADA REAL**\nAtivo: ${nome}\nTaxa: ${taxaEntrada}\nDireção: ${direcao === "CALL" ? "COMPRA 🟢" : "VENDA 🔴"}` 
-    });
+    dispararSinal(msgEntrada, 'ENTRADA');
 
-    // 2. ESPERA O TEMPO DO GRÁFICO
     setTimeout(() => {
-        // Conecta rápido para pegar o preço de fechamento real
         const wsCheck = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
         wsCheck.on('open', () => wsCheck.send(JSON.stringify({ ticks: idAtivo })));
         
@@ -67,29 +88,21 @@ function executarOperacaoReal(idAtivo, direcao, taxaEntrada) {
                 const taxaSaida = res.tick.quote;
                 wsCheck.terminate();
 
-                // 3. COMPARAÇÃO MATEMÁTICA REAL
-                let ganhou = false;
-                if (direcao === "CALL" && taxaSaida > taxaEntrada) ganhou = true;
-                if (direcao === "PUT" && taxaSaida < taxaEntrada) ganhou = true;
-
+                let ganhou = (direcao === "CALL" && taxaSaida > taxaEntrada) || (direcao === "PUT" && taxaSaida < taxaEntrada);
                 const resultado = ganhou ? 'WIN' : 'LOSS';
                 const emoji = ganhou ? '✅' : '❌';
 
-                // 4. ENVIA O RESULTADO BASEADO NO PREÇO, NÃO NA SORTE
-                io.emit('sinal_app', { 
-                    tipo: 'RESULTADO', 
-                    texto: `${emoji} **FECHAMENTO REAL**\nEntrada: ${taxaEntrada}\nSaída: ${taxaSaida}\nResultado: ${resultado}`,
-                    resultado: resultado 
-                });
+                const msgResult = `${emoji} **RESULTADO: ${resultado}**\n\n📊 Ativo: ${nome}\n🏁 Saída: ${taxaSaida}`;
+                
+                dispararSinal(msgResult, 'RESULTADO', resultado);
 
-                // Libera para a próxima análise após 5 segundos
                 setTimeout(() => { operacaoEmCurso = false; }, 5000);
             }
         });
-    }, tempoExpiracao);
+    }, 10000);
 }
 
 server.listen(process.env.PORT || 3000, () => {
-    console.log("🚀 SISTEMA 100% REAL INICIADO");
+    console.log("🚀 SISTEMA KCM CONECTADO: TELEGRAM + VISOR");
     iniciarMotorReal();
 });
