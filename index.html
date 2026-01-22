@@ -56,4 +56,225 @@
         #config-tab { display: none; position: absolute; bottom: 115px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 15px; z-index: 200; border: 1px solid #333; box-shadow: 0 0 30px #000; max-height: 70vh; overflow-y: auto; }
         .config-row { background: #0e1621; padding: 8px; border-radius: 8px; margin-bottom: 8px; }
         .config-row small { display: block; color: var(--tg-blue); margin-bottom: 4px; font-size: 9px; }
-        .config-row select, .config-row input { background: #17212b; color: white; border: 1px solid #333; border-radius: 4px; font-size
+        .config-row select, .config-row input { background: #17212b; color: white; border: 1px solid #333; border-radius: 4px; font-size: 10px; padding: 4px; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+<audio id="snd-alert" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+<audio id="snd-green" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3"></audio>
+<audio id="snd-red" src="https://assets.mixkit.co/active_storage/sfx/2513/2513-preview.mp3"></audio>
+
+<div id="app">
+    <div class="tg-header">
+        <div class="tg-avatar">KC</div>
+        <div class="tg-info">
+            <b>🤖 KCM MASTER SUPREMO</b>
+            <span class="placar-topo" id="placar-txt">✅ 0 | ❌ 0</span>
+        </div>
+        <div class="banca-header">
+            <small>SALDO ATUAL</small>
+            <b id="banca-topo">R$ 5000.00</b>
+        </div>
+    </div>
+
+    <div class="visor-chat" id="chat"></div>
+
+    <div class="signature-area">
+        <div class="shining-name">Aridelson B./G.</div>
+    </div>
+
+    <div id="config-tab">
+        <b style="color: var(--tg-blue); font-size: 11px;"><i class="fas fa-tasks"></i> PAINEL DE CONTROLE</b>
+        <div style="margin-top:10px;">
+            <div class="config-row">
+                <small>Estratégia Operacional</small>
+                <select id="selEstrategia">
+                    <option value="Fluxo Sniper">🎯 Fluxo Sniper</option>
+                    <option value="Sniper Retração">🏹 Sniper Retração</option>
+                    <option value="Regra 1">⚖️ Regra 1</option>
+                    <option value="Zig Zag">📉 Zig Zag</option>
+                    <option value="Pullback">🔄 Pullback</option>
+                    <option value="Fluxo de Tendência">📊 Fluxo de Tendência</option>
+                    <option value="M3 - Terceiro Toque">📐 M3 - Terceiro Toque (S/R)</option>
+                </select>
+            </div>
+            <div class="config-row"><small>Slot 1</small><select id="sel1"></select></div>
+            <div class="config-row"><small>Slot 2</small><select id="sel2"></select></div>
+            <div class="config-row"><small>Slot 3</small><select id="sel3"></select></div>
+            <div class="config-row" style="display: flex; gap: 5px;">
+                <div style="flex:1"><small>Banca R$</small><input type="number" id="inpBanca" value="5000"></div>
+                <div style="flex:1"><small>Payout %</small><input type="number" id="inpPay" value="95"></div>
+            </div>
+            <button onclick="toggleConfig()" style="width:100%; background:var(--tg-blue); border:none; color:white; border-radius:5px; font-weight:bold; padding:8px; font-size: 11px; cursor: pointer;">SALVAR E FECHAR</button>
+        </div>
+    </div>
+
+    <div class="tg-footer-area">
+        <div class="timer-strip">
+            <div id="p-ativo" style="font-size:8px; color:#f0b90b;">🛰️ Conectado ao Render</div>
+            <div id="timer-box">00s</div>
+        </div>
+        <div class="btn-row">
+            <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h"></i>AJUSTES</button>
+            <button class="btn-nav" onclick="enviarRelatorio()"><i class="fas fa-clipboard-list"></i>RELATÓRIO</button>
+            <button class="btn-nav" onclick="gerarPDF()"><i class="fas fa-file-pdf"></i>PDF</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CONEXÃO COM O SERVIDOR DO RENDER ---
+    // IMPORTANTE: Este link deve ser o do seu servidor ativo
+    const socket = io("https://app-fl26.onrender.com");
+
+    socket.on('sinal_app', (dados) => {
+        if(dados.tipo === 'ALERTA') {
+            document.getElementById('snd-alert').play().catch(()=>{});
+            addMsg(dados.texto, 'bubble-alert');
+        } else if(dados.tipo === 'ENTRADA') {
+            addMsg(dados.texto);
+        } else if(dados.tipo === 'RESULTADO') {
+            const classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
+            if(dados.resultado === 'WIN') {
+                document.getElementById('snd-green').play().catch(()=>{});
+                wins++;
+            } else {
+                document.getElementById('snd-red').play().catch(()=>{});
+                reds++;
+            }
+            addMsg(dados.texto, classe);
+            document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
+        }
+    });
+
+    // Lista de Ativos Disponíveis para Monitoramento
+    const LISTA_ATIVOS = [
+        { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+        { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
+        { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
+        { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
+        { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
+        { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
+        { id: "R_10", nome: "📊 Volatility 10" },
+        { id: "R_25", nome: "📊 Volatility 25" },
+        { id: "R_50", nome: "📊 Volatility 50" },
+        { id: "R_75", nome: "📊 Volatility 75" },
+        { id: "R_100", nome: "📊 Volatility 100" },
+        { id: "JD10", nome: "🚀 Jump 10" },
+        { id: "JD25", nome: "🚀 Jump 25" },
+        { id: "JD50", nome: "🚀 Jump 50" },
+        { id: "JD75", nome: "🚀 Jump 75" },
+        { id: "JD100", nome: "🚀 Jump 100" },
+        { id: "BOOM300", nome: "💥 Boom 300" },
+        { id: "BOOM500", nome: "💥 Boom 500" },
+        { id: "BOOM1000", nome: "💥 Boom 1000" },
+        { id: "CRASH300", nome: "📉 Crash 300" },
+        { id: "CRASH500", nome: "📉 Crash 500" },
+        { id: "CRASH1000", nome: "📉 Crash 1000" },
+        { id: "ST50", nome: "🎢 Step Index" },
+        { id: "frxEURUSD", nome: "💱 EUR/USD (Euro/Dólar)" },
+        { id: "frxGBPUSD", nome: "💱 GBP/USD (Libra/Dólar)" },
+        { id: "frxUSDJPY", nome: "💱 USD/JPY (Dólar/Iene)" },
+        { id: "frxAUDUSD", nome: "💱 AUD/USD (Dólar Aus./Dólar)" },
+        { id: "frxUSDCAD", nome: "💱 USD/CAD (Dólar/Dólar Can.)" },
+        { id: "frxUSDCHF", nome: "💱 USD/CHF (Dólar/Franco Suíço)" },
+        { id: "frxEURGBP", nome: "💱 EUR/GBP (Euro/Libra)" },
+        { id: "frxEURJPY", nome: "💱 EUR/JPY (Euro/Iene)" },
+        { id: "frxGBPJPY", nome: "💱 GBP/JPY (Libra/Iene)" },
+        { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
+        { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
+        { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
+        { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
+    ];
+
+    let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0, lucro = 0;
+    let precosAtuais = { slot1: 0, slot2: 0, slot3: 0 };
+    let derivSocket = null;
+
+    function getH() { return new Date().toLocaleTimeString().slice(0,5); }
+    
+    // Conexão direta com a Deriv para cotação em tempo real
+    function conectarDeriv() {
+        if (derivSocket) derivSocket.close();
+        derivSocket = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+        derivSocket.onopen = () => {
+            [1,2,3].forEach(i => {
+                const val = document.getElementById('sel'+i).value;
+                if(val !== "NONE") derivSocket.send(JSON.stringify({ticks: val}));
+            });
+        };
+        derivSocket.onmessage = (msg) => {
+            const data = JSON.parse(msg.data);
+            if (data.tick) {
+                const s = data.tick.symbol;
+                const v = data.tick.quote;
+                [1,2,3].forEach(i => {
+                    if(s === document.getElementById('sel'+i).value) precosAtuais['slot'+i] = v;
+                });
+                renderVisor();
+            }
+        };
+    }
+
+    function renderVisor() {
+        let txt = "";
+        [1,2,3].forEach(i => {
+            const sel = document.getElementById('sel'+i);
+            if(sel.value !== "NONE") txt += sel.selectedOptions[0].innerText.split(' (')[0] + ": " + precosAtuais['slot'+i] + " | ";
+        });
+        document.getElementById('p-ativo').innerText = txt || "🛰️ Aguardando Sinais do Render...";
+    }
+
+    function init() {
+        [1,2,3].forEach(i => {
+            const s = document.getElementById('sel'+i);
+            LISTA_ATIVOS.forEach(a => {
+                let opt = document.createElement('option');
+                opt.value = a.id; opt.innerText = a.nome; s.appendChild(opt);
+            });
+        });
+        conectarDeriv();
+        addMsg("💎 <b>SISTEMA KCM CONECTADO</b>\nOuvindo sinais do Telegram via Render...");
+    }
+
+    function addMsg(txt, type = '') {
+        const chat = document.getElementById('chat');
+        const div = document.createElement('div');
+        div.className = `bubble ${type}`;
+        div.innerHTML = `${txt}<span class="msg-time">${getH()}</span>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function toggleConfig() {
+        const t = document.getElementById('config-tab');
+        if (t.style.display === 'block') {
+            t.style.display = 'none';
+            conectarDeriv();
+        } else { t.style.display = 'block'; }
+    }
+
+    // Timer visual de contagem regressiva da vela
+    setInterval(() => {
+        const s = new Date().getSeconds();
+        document.getElementById('timer-box').innerText = (60-s).toString().padStart(2, '0') + "s";
+    }, 1000);
+
+    function enviarRelatorio() {
+        const total = wins + reds;
+        const wr = total > 0 ? ((wins / total) * 100).toFixed(0) : 0;
+        addMsg(`🗓<b>Relatório KCM MASTER</b>\n\n🔎Análises Recebidas: ${total}\n🤑Total Green: ${wins}\n😡Total Loos: ${reds}\n\n📈Eficiência: ${wr}%`);
+    }
+
+    function gerarPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("RELATORIO KCM SUPREMO", 10, 10);
+        doc.save("Relatorio_KCM.pdf");
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
