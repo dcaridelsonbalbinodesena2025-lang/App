@@ -13,12 +13,172 @@
             --tg-panel: #17212b; --tg-blue: #2481cc; 
             --tg-green: #45ad5b; --tg-red: #d14e4e; --tg-text: #f5f5f5;
         }
-        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 90vh; overflow: hidden; }
-        #app { width: 360px; height: 90vh; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; border: 1px solid #222; }
+        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 95vh; overflow: hidden; }
+        #app { width: 360px; height: 100%; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; border: 1px solid #222; }
         
         .signature-area { position: absolute; bottom: 125px; right: 15px; z-index: 50; pointer-events: none; }
         .shining-name { color: #ffeb3b; font-weight: bold; font-size: 11px; text-shadow: 0 0 8px #ffeb3b; animation: pulse-glow 2s infinite alternate; }
         @keyframes pulse-glow { from { opacity: 0.7; text-shadow: 0 0 5px #ffeb3b; } to { opacity: 1; text-shadow: 0 0 12px #ffeb3b; } }
 
         .tg-header { background: var(--tg-panel); padding: 8px 12px; display: flex; align-items: center; border-bottom: 1px solid #000; z-index: 100; }
-        .tg-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #50a2e3, #2481cc); border-radius: 50%; display: flex; align-items
+        .tg-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #50a2e3, #2481cc); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; margin-right: 10px; }
+        .tg-info { flex-grow: 1; }
+        .tg-info b { display: block; font-size: 10px; }
+        .placar-topo { color: #fff; font-size: 10px; font-weight: bold; display: block; margin-top: 2px; }
+        
+        .banca-header { text-align: right; min-width: 70px; }
+        .banca-header small { display: block; font-size: 7px; color: #8b949e; }
+        .banca-header b { font-size: 11px; color: var(--tg-green); }
+
+        .visor-chat { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-attachment: fixed; background-color: var(--tg-bg); background-blend-mode: overlay; }
+        .bubble { max-width: 85%; padding: 10px; border-radius: 12px; margin-bottom: 8px; font-size: 11px; color: white; align-self: flex-start; background: var(--tg-panel); border-left: 3px solid transparent; box-shadow: 0 1px 2px rgba(0,0,0,0.5); white-space: pre-wrap; animation: fadeIn 0.3s ease; }
+        .bubble-alert { border-left-color: #f0b90b; }
+        .bubble-green { border-left-color: var(--tg-green); }
+        .bubble-red { border-left-color: var(--tg-red); }
+        
+        .msg-time { display: block; text-align: right; font-size: 8px; opacity: 0.5; margin-top: 4px; }
+        .tg-footer-area { background: var(--tg-panel); border-top: 1px solid #000; padding: 10px; z-index: 100; }
+        .timer-strip { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 10px; }
+        #timer-box { background: #0e1621; padding: 3px 12px; border-radius: 20px; font-weight: 900; color: var(--tg-blue); font-size: 12px; border: 1px solid var(--tg-blue); }
+        .btn-row { display: flex; justify-content: space-around; }
+        .btn-nav { background: none; border: none; color: #8b949e; display: flex; flex-direction: column; align-items: center; cursor: pointer; font-size: 9px; }
+        .btn-nav i { font-size: 16px; margin-bottom: 3px; }
+
+        #config-tab { display: none; position: absolute; bottom: 120px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 15px; z-index: 200; border: 1px solid #333; box-shadow: 0 0 30px #000; }
+        .config-row { background: #0e1621; padding: 8px; border-radius: 8px; margin-bottom: 8px; }
+        .config-row small { display: block; color: var(--tg-blue); margin-bottom: 4px; font-size: 9px; }
+        .config-row select, .config-row input { background: #17212b; color: white; border: 1px solid #333; width: 100%; font-size: 11px; padding: 4px; }
+    </style>
+</head>
+<body>
+
+<audio id="snd-alert" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+<audio id="snd-green" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3"></audio>
+
+<div id="app">
+    <div class="tg-header">
+        <div class="tg-avatar">KC</div>
+        <div class="tg-info">
+            <b>🤖 KCM MASTER SUPREMO</b>
+            <span class="placar-topo" id="placar-txt">✅ 0 | ❌ 0</span>
+        </div>
+        <div class="banca-header">
+            <small>SALDO ATUAL</small>
+            <b id="banca-topo">R$ 15000.00</b>
+        </div>
+    </div>
+
+    <div class="visor-chat" id="chat"></div>
+
+    <div class="signature-area"><div class="shining-name">Aridelson B./G.</div></div>
+
+    <div id="config-tab">
+        <b style="color:var(--tg-blue); font-size:11px;">⚙️ AJUSTES DO SISTEMA</b>
+        <div style="margin-top:10px;">
+            <div class="config-row">
+                <small>Estratégia Operacional</small>
+                <select id="selEstrategia">
+                    <option value="Fluxo Sniper">🎯 Fluxo Sniper</option>
+                    <option value="Sniper Retração">🏹 Sniper Retração</option>
+                    <option value="Pullback">🔄 Pullback</option>
+                </select>
+            </div>
+            <div class="config-row">
+                <small>Valor da Banca (R$)</small>
+                <input type="number" id="inpBanca" value="15000">
+            </div>
+            <button onclick="salvarConfiguracoes()" style="width:100%; background:var(--tg-blue); border:none; color:white; border-radius:5px; padding:10px; font-weight:bold; cursor:pointer;">SALVAR ALTERAÇÕES</button>
+        </div>
+    </div>
+
+    <div class="tg-footer-area">
+        <div class="timer-strip">
+            <div id="p-ativo" style="font-size:8px; color:var(--tg-blue);">🛰️ Conectado ao Render</div>
+            <div id="timer-box">00s</div>
+        </div>
+        <div class="btn-row">
+            <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h"></i>AJUSTES</button>
+            <button class="btn-nav" onclick="enviarRelatorio()"><i class="fas fa-clipboard-list"></i>RELATÓRIO</button>
+            <button class="btn-nav" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i>RESET</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io("https://app-fl26.onrender.com");
+
+    let bancaInicial = 15000, bancaAtual = 15000, wins = 0, reds = 0, analises = 0, abortadas = 0;
+    let winsG1 = 0, winsG2 = 0;
+
+    socket.on('sinal_app', (dados) => {
+        if(dados.tipo === 'ALERTA') {
+            document.getElementById('snd-alert').play().catch(()=>{});
+            analises++;
+            addMsg(dados.texto, 'bubble-alert');
+        } else if(dados.tipo === 'RESULTADO') {
+            const classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
+            if(dados.resultado === 'WIN') {
+                document.getElementById('snd-green').play().catch(()=>{});
+                wins++;
+                bancaAtual += 150.00; // Simula o lucro no saldo
+                if(dados.texto.includes("GALE 1")) winsG1++;
+                else if(dados.texto.includes("GALE 2")) winsG2++;
+            } else {
+                reds++;
+                bancaAtual -= 100.00;
+            }
+            addMsg(dados.texto, classe);
+            document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
+            document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
+        }
+    });
+
+    function addMsg(txt, type = '') {
+        const chat = document.getElementById('chat');
+        const div = document.createElement('div');
+        div.className = `bubble ${type}`;
+        div.innerHTML = `${txt}<span class="msg-time">${new Date().toLocaleTimeString().slice(0,5)}</span>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function toggleConfig() {
+        const t = document.getElementById('config-tab');
+        t.style.display = (t.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function salvarConfiguracoes() {
+        const novaEst = document.getElementById('selEstrategia').value;
+        const novaBanca = parseFloat(document.getElementById('inpBanca').value);
+        
+        bancaInicial = novaBanca;
+        bancaAtual = novaBanca;
+        document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
+        
+        socket.emit('mudar_estrategia', novaEst); // Avisa o servidor
+        toggleConfig();
+    }
+
+    function enviarRelatorio() {
+        const total = wins + reds;
+        const wr = total > 0 ? ((wins / total) * 100).toFixed(0) : 0;
+        const lucroTotal = bancaAtual - bancaInicial;
+
+        const rel = `🗓<b>Relatório KCM MASTER</b>\n\n` +
+            `🔎 Análises: ${analises}\n` +
+            `♻️ Win G1: ${winsG1} | G2: ${winsG2}\n` +
+            `🤑 Greens: ${wins}\n` +
+            `😡 Reds: ${reds}\n\n` +
+            `📈 Eficiência: ${wr}%\n` +
+            `💰 Banca: ${bancaInicial.toFixed(2)}R$\n` +
+            `🤑 Lucro: ${lucroTotal.toFixed(2)}R$`;
+        addMsg(rel, 'bubble-alert');
+    }
+
+    setInterval(() => {
+        const s = new Date().getSeconds();
+        document.getElementById('timer-box').innerText = (60-s).toString().padStart(2, '0') + "s";
+    }, 1000);
+</script>
+</body>
+</html>
