@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KCM - VISOR 3 SLOTS</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { 
@@ -12,7 +12,6 @@
             --tg-panel: #17212b; --tg-blue: #2481cc; 
             --tg-green: #45ad5b; --tg-red: #d14e4e; --tg-text: #f5f5f5;
         }
-        /* Ajuste de altura para celulares sem mexer no layout */
         body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 100dvh; overflow: hidden; }
         #app { width: 100%; max-width: 400px; height: 100%; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; }
         
@@ -35,7 +34,6 @@
         .tg-footer { background: var(--tg-panel); padding: 12px 12px 25px 12px; border-top: 1px solid #000; }
         #timer-box { font-weight: bold; color: var(--tg-blue); text-align: center; font-size: 11px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; }
         
-        /* Luz de Status */
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; }
         .status-online { background: var(--tg-green); box-shadow: 0 0 5px var(--tg-green); }
         .status-offline { background: var(--tg-red); }
@@ -91,7 +89,7 @@
     <div class="tg-footer">
         <div id="timer-box">
             <span id="status-led" class="status-dot"></span>
-            <span id="status-label">Conectando ao Robô...</span>
+            <span id="status-label">Conectando...</span>
         </div>
         <div class="btn-row">
             <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h" style="font-size:18px; margin-bottom:4px;"></i>AJUSTES</button>
@@ -101,6 +99,7 @@
 </div>
 
 <script>
+        // --- LISTA DE ATIVOS QUE VOCÊ ENVIOU ---
     const LISTA_ATIVOS = [
         { id: "NONE", nome: "❌ DESATIVAR SLOT" },
         { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
@@ -144,22 +143,21 @@
         { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP/USD)" },
         { id: "cryBCHUSD", nome: "₿ BITCOIN CASH (BCH/USD)" },
         { id: "cryEOSUSD", nome: "🌐 EOS (EOS/USD)" },
-        { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
+        { id: "cryDSHUSD", nome: "💨 DASH (DASH/USD)" }
     ];
 
 
-    // CONEXÃO COM O SEU RENDER CORRETO
     const socket = io("https://multiplaskcmp.onrender.com");
     let wins = 0, reds = 0, bancaAtual = 5000;
 
     socket.on('connect', () => {
         document.getElementById('status-led').className = 'status-dot status-online';
-        document.getElementById('status-label').innerText = "Vela em: 00s";
+        document.getElementById('status-label').innerText = "Analisando vela...";
     });
 
     socket.on('disconnect', () => {
         document.getElementById('status-led').className = 'status-dot status-offline';
-        document.getElementById('status-label').innerText = "Robô Offline...";
+        document.getElementById('status-label').innerText = "Reconectando...";
     });
 
     socket.on('sinal_app', (dados) => {
@@ -192,7 +190,8 @@
     }
 
     function salvarConfig() {
-        bancaAtual = parseFloat(document.getElementById('inpBanca').value);
+        const novaBanca = document.getElementById('inpBanca').value;
+        bancaAtual = parseFloat(novaBanca);
         document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
         toggleConfig();
         addMsg("⚙️ Ajustes Salvos!", "");
@@ -201,10 +200,12 @@
     window.onload = () => {
         [1,2,3].forEach(i => {
             const sel = document.getElementById('sel'+i);
-            LISTA_ATIVOS.forEach(a => {
-                let opt = document.createElement('option');
-                opt.value = a.id; opt.innerText = a.nome; sel.appendChild(opt);
-            });
+            if(sel) {
+                LISTA_ATIVOS.forEach(a => {
+                    let opt = document.createElement('option');
+                    opt.value = a.id; opt.innerText = a.nome; sel.appendChild(opt);
+                });
+            }
         });
         addMsg("🤖 KCM Master Iniciado!", "");
     }
