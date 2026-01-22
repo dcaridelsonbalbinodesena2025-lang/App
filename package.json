@@ -1,5 +1,5 @@
 {
-  "name": "servidor-kcm-completo",
+  "name": "robo-kcm-dual",
   "version": "1.0.0",
   "main": "server.js",
   "dependencies": {
