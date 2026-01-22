@@ -42,3 +42,179 @@
         .btn-nav { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 10px; display: flex; flex-direction: column; align-items: center; }
         
         #config-tab { display: none; position: absolute; bottom: 80px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 12px; border: 1px solid #444; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.8); max-height: 70vh; overflow-y: auto; }
+        .config-row { margin-bottom: 8px; }
+        .config-row label { font-size: 9px; color: var(--tg-blue); font-weight: bold; display: block; margin-bottom: 2px; text-transform: uppercase; }
+        select, input { width: 100%; background: #0e1621; border: 1px solid #333; color: white; padding: 5px; border-radius: 5px; font-size: 11px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="tg-header">
+        <div class="tg-avatar">KC</div>
+        <div class="tg-info">
+            <b>KCM MASTER BOT</b>
+            <div style="font-size: 10px; color: #8b949e;" id="placar-txt">✅ 0 | ❌ 0</div>
+        </div>
+        <div class="banca-header">
+            <small style="font-size: 8px; color: var(--tg-blue);">SALDO APP</small>
+            <b id="banca-topo">R$ 5000.00</b>
+        </div>
+    </div>
+
+    <div class="visor-chat" id="chat"></div>
+
+    <div id="config-tab">
+        <div class="config-row">
+            <label>Estratégia Operacional</label>
+            <select id="selEstrategia">
+                <option value="Fluxo Sniper">🎯 Fluxo Sniper</option>
+                <option value="Regra 1">⚖️ Regra 1</option>
+                <option value="Zig Zag">📉 Zig Zag</option>
+                <option value="Sniper Retração">🏹 Sniper Retração</option>
+            </select>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #333; margin: 10px 0;">
+        <div class="config-row"><label>Ativo Slot 1</label><select id="sel1"></select></div>
+        <div class="config-row"><label>Ativo Slot 2</label><select id="sel2"></select></div>
+        <div class="config-row"><label>Ativo Slot 3</label><select id="sel3"></select></div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <div class="config-row" style="flex:1"><label>Banca R$</label><input type="number" id="inpBanca" value="5000"></div>
+            <div class="config-row" style="flex:1"><label>Payout %</label><input type="number" id="inpPay" value="95"></div>
+        </div>
+        <button onclick="salvarConfig()" style="width:100%; padding:10px; background:var(--tg-blue); color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer; margin-top: 10px;">SALVAR CONFIGURAÇÕES</button>
+    </div>
+
+    <div class="tg-footer">
+        <div id="timer-box">
+            <span id="status-led" class="status-dot"></span>
+            <span id="status-label">Conectando...</span>
+        </div>
+        <div class="btn-row">
+            <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h" style="font-size:18px; margin-bottom:4px;"></i>AJUSTES</button>
+            <button class="btn-nav" onclick="location.reload()"><i class="fas fa-sync" style="font-size:18px; margin-bottom:4px;"></i>RESET</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const LISTA_ATIVOS = [
+        { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+        { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
+        { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
+        { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
+        { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
+        { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
+        { id: "R_10", nome: "📊 Volatility 10" },
+        { id: "R_25", nome: "📊 Volatility 25" },
+        { id: "R_50", nome: "📊 Volatility 50" },
+        { id: "R_75", nome: "📊 Volatility 75" },
+        { id: "R_100", nome: "📊 Volatility 100" },
+        { id: "JD10", nome: "🚀 Jump 10" },
+        { id: "JD25", nome: "🚀 Jump 25" },
+        { id: "JD50", nome: "🚀 Jump 50" },
+        { id: "JD75", nome: "🚀 Jump 75" },
+        { id: "JD100", nome: "🚀 Jump 100" },
+        { id: "BOOM300", nome: "💥 Boom 300" },
+        { id: "BOOM500", nome: "💥 Boom 500" },
+        { id: "BOOM1000", nome: "💥 Boom 1000" },
+        { id: "CRASH300", nome: "📉 Crash 300" },
+        { id: "CRASH500", nome: "📉 Crash 500" },
+        { id: "CRASH1000", nome: "📉 Crash 1000" },
+        { id: "ST50", nome: "🎢 Step Index" },
+        { id: "frxEURUSD", nome: "💱 EUR/USD (Euro/Dólar)" },
+        { id: "frxGBPUSD", nome: "💱 GBP/USD (Libra/Dólar)" },
+        { id: "frxUSDJPY", nome: "💱 USD/JPY (Dólar/Iene)" },
+        { id: "frxAUDUSD", nome: "💱 AUD/USD (Dólar Aus./Dólar)" },
+        { id: "frxUSDCAD", nome: "💱 USD/CAD (Dólar/Dólar Can.)" },
+        { id: "frxUSDCHF", nome: "💱 USD/CHF (Dólar/Franco Suíço)" },
+        { id: "frxEURGBP", nome: "💱 EUR/GBP (Euro/Libra)" },
+        { id: "frxEURJPY", nome: "💱 EUR/JPY (Euro/Iene)" },
+        { id: "frxGBPJPY", nome: "💱 GBP/JPY (Libra/Iene)" },
+        { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
+        { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
+        { id: "frxXPDUSD", nome: "🧪 PALÁDIO (XPD/USD)" },
+        { id: "frxXPTUSD", nome: "⚪ PLATINA (XPT/USD)" },
+        { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
+        { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" },
+        { id: "cryLTCUSD", nome: "Ł LITECOIN (LTC/USD)" },
+        { id: "cryXRPUSD", nome: "✕ RIPPLE (XRP/USD)" },
+        { id: "cryBCHUSD", nome: "₿ BITCOIN CASH (BCH/USD)" },
+        { id: "cryEOSUSD", nome: "🌐 EOS (EOS/USD)" },
+        { id: "cryDSHUSD", nome: "💨 DASH (DASH/USD)" }
+    ];
+
+    // CONECTANDO AO SERVIDOR CORRETO
+    const socket = io("https://app-fl26.onrender.com");
+    let wins = 0, reds = 0, bancaAtual = 5000;
+
+    socket.on('connect', () => {
+        document.getElementById('status-led').className = 'status-dot status-online';
+        document.getElementById('status-label').innerText = "Analisando vela...";
+    });
+
+    socket.on('disconnect', () => {
+        document.getElementById('status-led').className = 'status-dot status-offline';
+        document.getElementById('status-label').innerText = "Reconectando...";
+    });
+
+    socket.on('sinal_app', (dados) => {
+        let classe = '';
+        if(dados.tipo === 'ALERTA') classe = 'bubble-alert';
+        if(dados.tipo === 'RESULTADO') {
+            classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
+            let pay = parseFloat(document.getElementById('inpPay').value) / 100;
+            if(dados.resultado === 'WIN') { wins++; bancaAtual += (10 * pay); }
+            else { reds++; bancaAtual -= 10; }
+            document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
+            document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
+        }
+        addMsg(dados.texto, classe);
+    });
+
+    function addMsg(txt, classe) {
+        const chat = document.getElementById('chat');
+        const div = document.createElement('div');
+        div.className = `bubble ${classe}`;
+        const h = new Date().toLocaleTimeString().slice(0,5);
+        div.innerHTML = `${txt.replace(/\n/g, '<br>')}<span class="msg-time">${h}</span>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function toggleConfig() {
+        const tab = document.getElementById('config-tab');
+        tab.style.display = tab.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function salvarConfig() {
+        const novaBanca = document.getElementById('inpBanca').value;
+        bancaAtual = parseFloat(novaBanca);
+        document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
+        toggleConfig();
+        addMsg("⚙️ Ajustes Salvos!", "");
+    }
+
+    window.onload = () => {
+        [1,2,3].forEach(i => {
+            const sel = document.getElementById('sel'+i);
+            if(sel) {
+                LISTA_ATIVOS.forEach(a => {
+                    let opt = document.createElement('option');
+                    opt.value = a.id; opt.innerText = a.nome; sel.appendChild(opt);
+                });
+            }
+        });
+        addMsg("🤖 KCM Master Iniciado!", "");
+    }
+
+    setInterval(() => {
+        if(socket.connected) {
+            const s = new Date().getSeconds();
+            document.getElementById('status-label').innerText = "Analisando vela: " + (60 - s) + "s";
+        }
+    }, 1000);
+</script>
+</body>
+</html>
