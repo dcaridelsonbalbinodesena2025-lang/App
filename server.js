@@ -6,21 +6,28 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 
 const app = express();
-app.use(cors());
+
+// Isso libera o acesso do seu index.html ao servidor
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST"]
+}));
+
 const server = http.createServer(app);
 
-// AJUSTE AQUI: Liberando a conexão para o seu App (index.html) conseguir entrar
+// Configuração especial do Socket para aceitar conexões externas
 const io = socketIo(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
-    }
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling']
 });
 
 const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI"; 
 const TG_CHAT_ID = "-1003355965894"; 
 
-// Adicionei todos os ativos para o servidor reconhecer o que vem do App
 const ATIVOS = { 
     "R_10": "Volatility 10 Index", 
     "1HZ10V": "Volatility 10 (1s) Index",
@@ -29,10 +36,8 @@ const ATIVOS = {
 };
 
 function dispararSinal(mensagem, tipo, resultado = null) {
-    // Envia para o App
     io.emit('sinal_app', { tipo: tipo, texto: mensagem, resultado: resultado });
     
-    // Envia para o Telegram
     fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,12 +76,8 @@ function iniciarMotorKCM() {
         function executarOperacao(idAtivo, direcao, taxaEntrada, estrategia, gale) {
             m.opAtiva = true;
             const nome = ATIVOS[idAtivo] || idAtivo;
-            
-            const tempoInicio = new Date();
-            const tempoFim = new Date(tempoInicio.getTime() + 10000); 
-            
-            const hI = tempoInicio.toLocaleTimeString();
-            const hF = tempoFim.toLocaleTimeString();
+            const hI = new Date().toLocaleTimeString();
+            const hF = new Date(Date.now() + 10000).toLocaleTimeString();
 
             const msg = `🚀 <b>${gale === 0 ? "ENTRADA" : "GALE " + gale} CONFIRMADA</b>\n\n` +
                         `📊 Ativo: ${nome}\n` +
@@ -111,7 +112,9 @@ function iniciarMotorKCM() {
     });
 }
 
-server.listen(process.env.PORT || 3000, () => { 
-    console.log("🚀 SERVIDOR KCM ONLINE COM CORS LIBERADO");
+// Porta dinâmica para o Render
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => { 
+    console.log(`🚀 SERVIDOR KCM ONLINE NA PORTA ${PORT}`);
     iniciarMotorKCM(); 
 });
