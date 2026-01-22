@@ -1,75 +1,298 @@
-const WebSocket = require('ws');
-const fetch = require('node-fetch');
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const socketIo = require('socket.io');
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KCM - TELEGRAM SUPREMO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { 
+            --tg-bg: #1c2733; 
+            --tg-panel: #17212b; --tg-blue: #2481cc; 
+            --tg-green: #45ad5b; --tg-red: #d14e4e; --tg-text: #f5f5f5;
+        }
+        body { background: #070a0e; color: var(--tg-text); font-family: 'Open Sans', sans-serif; display: flex; justify-content: center; margin: 0; height: 90vh; overflow: hidden; }
+        #app { width: 360px; height: 90vh; background: var(--tg-bg); display: flex; flex-direction: column; position: relative; border: 1px solid #222; }
+        
+        .signature-area { position: absolute; bottom: 125px; right: 15px; z-index: 50; pointer-events: none; }
+        .shining-name { color: #ffeb3b; font-weight: bold; font-size: 11px; text-shadow: 0 0 8px #ffeb3b; animation: pulse-glow 2s infinite alternate; }
+        @keyframes pulse-glow { from { opacity: 0.7; text-shadow: 0 0 5px #ffeb3b; } to { opacity: 1; text-shadow: 0 0 12px #ffeb3b; } }
 
-const app = express();
-app.use(express.json());
-app.use(cors());
+        .tg-header { background: var(--tg-panel); padding: 8px 12px; display: flex; align-items: center; border-bottom: 1px solid #000; z-index: 100; }
+        .tg-avatar { width: 32px; height: 32px; background: linear-gradient(135deg, #50a2e3, #2481cc); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px; margin-right: 10px; }
+        .tg-info { flex-grow: 1; }
+        .tg-info b { display: block; font-size: 10px; }
+        .placar-topo { color: #fff; font-size: 10px; font-weight: bold; display: block; margin-top: 2px; }
+        
+        .banca-header { text-align: right; min-width: 70px; }
+        .banca-header small { display: block; font-size: 7px; color: #8b949e; }
+        .banca-header b { font-size: 10px; transition: 0.3s; }
 
-const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: { origin: "*" }
-});
+        .visor-chat { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; background: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); background-attachment: fixed; background-color: var(--tg-bg); background-blend-mode: overlay; }
+        .bubble { max-width: 85%; padding: 10px; border-radius: 12px; margin-bottom: 8px; font-size: 11px; line-height: 1.5; color: white; align-self: flex-start; background: var(--tg-panel); border-bottom-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.5); white-space: pre-wrap; animation: fadeIn 0.3s ease; border-left: 3px solid transparent; }
+        .bubble-alert { border-left-color: #f0b90b; }
+        .bubble-green { border-left-color: var(--tg-green); }
+        .bubble-red { border-left-color: var(--tg-red); }
+        
+        .msg-time { display: block; text-align: right; font-size: 8px; opacity: 0.5; margin-top: 4px; }
+        .tg-footer-area { background: var(--tg-panel); border-top: 1px solid #000; padding: 10px; z-index: 100; }
+        .timer-strip { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 10px; }
+        #timer-box { background: #0e1621; padding: 3px 12px; border-radius: 20px; font-weight: 900; color: var(--tg-blue); font-size: 12px; border: 1px solid var(--tg-blue); }
+        .btn-row { display: flex; justify-content: space-around; }
+        .btn-nav { background: none; border: none; color: #8b949e; display: flex; flex-direction: column; align-items: center; cursor: pointer; font-size: 9px; }
+        .btn-nav i { font-size: 16px; margin-bottom: 3px; }
 
-const PORT = process.env.PORT || 3000; 
+        #config-tab { display: none; position: absolute; bottom: 115px; left: 10px; right: 10px; background: var(--tg-panel); padding: 15px; border-radius: 15px; z-index: 200; border: 1px solid #333; box-shadow: 0 0 30px #000; max-height: 70vh; overflow-y: auto; }
+        .config-row { background: #0e1621; padding: 8px; border-radius: 8px; margin-bottom: 8px; }
+        .config-row small { display: block; color: var(--tg-blue); margin-bottom: 4px; font-size: 9px; }
+        .config-row select, .config-row input { background: #17212b; color: white; border: 1px solid #333; border-radius: 4px; font-size: 10px; padding: 4px; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
 
-// --- CONFIGURAÇÕES ATUALIZADAS (CONFORME SUAS FOTOS) ---
-const TG_TOKEN = "8427077212:AAEiL_3_D_-fukuaR95V3FqoYYyHvdCHmEI"; //
-const TG_CHAT_ID = "-1003355965894"; //
+<audio id="snd-alert" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3"></audio>
+<audio id="snd-green" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3"></audio>
+<audio id="snd-red" src="https://assets.mixkit.co/active_storage/sfx/2513/2513-preview.mp3"></audio>
 
-// Variáveis de Estado (Iniciando com os valores do seu motor)
-let fin = { bancaInicial: 5000, bancaAtual: 5000 };
-let stats = { winDireto: 0, winG1: 0, winG2: 0, loss: 0 };
+<div id="app">
+    <div class="tg-header">
+        <div class="tg-avatar">KC</div>
+        <div class="tg-info">
+            <b>🤖 KCM MASTER SUPREMO</b>
+            <span class="placar-topo" id="placar-txt">✅ 0 | ❌ 0</span>
+        </div>
+        <div class="banca-header">
+            <small>SALDO ATUAL</small>
+            <b id="banca-topo">R$ 5000.00</b>
+        </div>
+    </div>
 
-app.get('/', (req, res) => {
-    res.send('<h1>🚀 Servidor KCM MASTER Ativo!</h1><p>Sinais sendo enviados para o Index HTML.</p>');
-});
+    <div class="visor-chat" id="chat"></div>
 
-// --- FUNÇÃO DE ENVIO PARA O APP ---
-function enviarParaApp(canal, dados) {
-    io.emit(canal, dados);
-}
+    <div class="signature-area">
+        <div class="shining-name">Aridelson B./G.</div>
+    </div>
 
-// --- MENSAGENS CONFIGURADAS APENAS PARA A TELA DO APP ---
+    <div id="config-tab">
+        <b style="color: var(--tg-blue); font-size: 11px;"><i class="fas fa-tasks"></i> PAINEL DE CONTROLE</b>
+        <div style="margin-top:10px;">
+            <div class="config-row">
+                <small>Estratégia Operacional</small>
+                <select id="selEstrategia">
+                    <option value="Fluxo Sniper">🎯 Fluxo Sniper</option>
+                    <option value="Sniper Retração">🏹 Sniper Retração</option>
+                    <option value="Regra 1">⚖️ Regra 1</option>
+                    <option value="Zig Zag">📉 Zig Zag</option>
+                    <option value="Pullback">🔄 Pullback</option>
+                    <option value="Fluxo de Tendência">📊 Fluxo de Tendência</option>
+                    <option value="M3 - Terceiro Toque">📐 M3 - Terceiro Toque (S/R)</option>
+                </select>
+            </div>
+            <div class="config-row"><small>Slot 1</small><select id="sel1"></select></div>
+            <div class="config-row"><small>Slot 2</small><select id="sel2"></select></div>
+            <div class="config-row"><small>Slot 3</small><select id="sel3"></select></div>
+            <div class="config-row" style="display: flex; gap: 5px;">
+                <div style="flex:1"><small>Banca R$</small><input type="number" id="inpBanca" value="5000"></div>
+                <div style="flex:1"><small>Payout %</small><input type="number" id="inpPay" value="95"></div>
+            </div>
+            <button onclick="toggleConfig()" style="width:100%; background:var(--tg-blue); border:none; color:white; border-radius:5px; font-weight:bold; padding:8px; font-size: 11px; cursor: pointer;">SALVAR E FECHAR</button>
+        </div>
+    </div>
 
-function msgAlerta(m, est, dir) { 
-    const texto = `🔍 *ALERTA DE SINAL*\n\n📊 Ativo: ${m.nome}\n⚡ Estratégia: ${est}\n🎯 Direção: ${dir}`;
+    <div class="tg-footer-area">
+        <div class="timer-strip">
+            <div id="p-ativo" style="font-size:8px; color:#f0b90b;">🛰️ Conectado ao Render</div>
+            <div id="timer-box">00s</div>
+        </div>
+        <div class="btn-row">
+            <button class="btn-nav" onclick="toggleConfig()"><i class="fas fa-sliders-h"></i>AJUSTES</button>
+            <button class="btn-nav" onclick="enviarRelatorio()"><i class="fas fa-clipboard-list"></i>RELATÓRIO</button>
+            <button class="btn-nav" onclick="gerarPDF()"><i class="fas fa-file-pdf"></i>PDF</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io("https://app-fl26.onrender.com");
+
+    // Variáveis Globais
+    let bancaInicial = 5000, bancaAtual = 5000, wins = 0, reds = 0, analises = 0, abortadas = 0, lucro = 0;
+    let winsG1 = 0, winsG2 = 0;
+
+    socket.on('sinal_app', (dados) => {
+        if(dados.tipo === 'ALERTA') {
+            document.getElementById('snd-alert').play().catch(()=>{});
+            analises++;
+            addMsg(dados.texto, 'bubble-alert');
+        } else if(dados.tipo === 'ENTRADA') {
+            addMsg(dados.texto);
+        } else if(dados.tipo === 'RESULTADO') {
+            const classe = dados.resultado === 'WIN' ? 'bubble-green' : 'bubble-red';
+            if(dados.resultado === 'WIN') {
+                document.getElementById('snd-green').play().catch(()=>{});
+                wins++;
+                // Lógica simples para simular Gale no relatório vindo do servidor
+                if(dados.texto.includes("GALE 1")) winsG1++;
+                else if(dados.texto.includes("GALE 2")) winsG2++;
+            } else {
+                document.getElementById('snd-red').play().catch(()=>{});
+                reds++;
+            }
+            addMsg(dados.texto, classe);
+            document.getElementById('placar-txt').innerText = `✅ ${wins} | ❌ ${reds}`;
+        }
+    });
+
+    const LISTA_ATIVOS = [
+        { id: "NONE", nome: "❌ DESATIVAR SLOT" },
+        { id: "1HZ10V", nome: "📈 Volatility 10 (1s)" },
+        { id: "1HZ25V", nome: "📈 Volatility 25 (1s)" },
+        { id: "1HZ50V", nome: "📈 Volatility 50 (1s)" },
+        { id: "1HZ75V", nome: "📈 Volatility 75 (1s)" },
+        { id: "1HZ100V", nome: "📈 Volatility 100 (1s)" },
+        { id: "R_10", nome: "📊 Volatility 10" },
+        { id: "R_25", nome: "📊 Volatility 25" },
+        { id: "R_50", nome: "📊 Volatility 50" },
+        { id: "R_75", nome: "📊 Volatility 75" },
+        { id: "R_100", nome: "📊 Volatility 100" },
+        { id: "JD10", nome: "🚀 Jump 10" },
+        { id: "JD25", nome: "🚀 Jump 25" },
+        { id: "JD50", nome: "🚀 Jump 50" },
+        { id: "JD75", nome: "🚀 Jump 75" },
+        { id: "JD100", nome: "🚀 Jump 100" },
+        { id: "BOOM300", nome: "💥 Boom 300" },
+        { id: "BOOM500", nome: "💥 Boom 500" },
+        { id: "BOOM1000", nome: "💥 Boom 1000" },
+        { id: "CRASH300", nome: "📉 Crash 300" },
+        { id: "CRASH500", nome: "📉 Crash 500" },
+        { id: "CRASH1000", nome: "📉 Crash 1000" },
+        { id: "ST50", nome: "🎢 Step Index" },
+        { id: "frxEURUSD", nome: "💱 EUR/USD (Euro/Dólar)" },
+        { id: "frxGBPUSD", nome: "💱 GBP/USD (Libra/Dólar)" },
+        { id: "frxUSDJPY", nome: "💱 USD/JPY (Dólar/Iene)" },
+        { id: "frxAUDUSD", nome: "💱 AUD/USD (Dólar Aus./Dólar)" },
+        { id: "frxUSDCAD", nome: "💱 USD/CAD (Dólar/Dólar Can.)" },
+        { id: "frxUSDCHF", nome: "💱 USD/CHF (Dólar/Franco Suíço)" },
+        { id: "frxEURGBP", nome: "💱 EUR/GBP (Euro/Libra)" },
+        { id: "frxEURJPY", nome: "💱 EUR/JPY (Euro/Iene)" },
+        { id: "frxGBPJPY", nome: "💱 GBP/JPY (Libra/Iene)" },
+        { id: "frxXAUUSD", nome: "🪙 OURO (XAU/USD)" },
+        { id: "frxXAGUSD", nome: "🥈 PRATA (XAG/USD)" },
+        { id: "cryBTCUSD", nome: "₿ BITCOIN (BTC/USD)" },
+        { id: "cryETHUSD", nome: "♢ ETHEREUM (ETH/USD)" }
+    ];
+
+    let precosAtuais = { slot1: 0, slot2: 0, slot3: 0 };
+    let derivSocket = null;
+
+    function getH() { return new Date().toLocaleTimeString().slice(0,5); }
     
-    // Envia apenas para o index.html
-    enviarParaApp('sinal_app', {
-        tipo: 'ALERTA',
-        ativo: m.nome,
-        texto: texto
-    });
-}
+    function conectarDeriv() {
+        if (derivSocket) derivSocket.close();
+        derivSocket = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+        derivSocket.onopen = () => {
+            [1,2,3].forEach(i => {
+                const val = document.getElementById('sel'+i).value;
+                if(val !== "NONE") derivSocket.send(JSON.stringify({ticks: val}));
+            });
+        };
+        derivSocket.onmessage = (msg) => {
+            const data = JSON.parse(msg.data);
+            if (data.tick) {
+                const s = data.tick.symbol;
+                const v = data.tick.quote;
+                [1,2,3].forEach(i => {
+                    if(s === document.getElementById('sel'+i).value) precosAtuais['slot'+i] = v;
+                });
+                renderVisor();
+            }
+        };
+    }
 
-function msgEntrada(m, est, dir) { 
-    let placar = `🟢 ${stats.winDireto + stats.winG1 + stats.winG2}W | 🔴 ${stats.loss}L`;
-    const texto = `🚀 *ENTRADA CONFIRMADA*\n\n📊 Ativo: ${m.nome}\n⚡ Estratégia: ${est}\n🎯 Direção: ${dir === "CALL" ? "COMPRA 🟢" : "VENDA 🔴"}\n🕒 Placar: ${placar}`;
+    function renderVisor() {
+        let txt = "";
+        [1,2,3].forEach(i => {
+            const sel = document.getElementById('sel'+i);
+            if(sel.value !== "NONE") txt += sel.selectedOptions[0].innerText.split(' (')[0] + ": " + precosAtuais['slot'+i] + " | ";
+        });
+        document.getElementById('p-ativo').innerText = txt || "🛰️ Conectado ao Render";
+    }
 
-    enviarParaApp('sinal_app', {
-        tipo: 'ENTRADA',
-        ativo: m.nome,
-        texto: texto
-    });
-}
+    function init() {
+        [1,2,3].forEach(i => {
+            const s = document.getElementById('sel'+i);
+            LISTA_ATIVOS.forEach(a => {
+                let opt = document.createElement('option');
+                opt.value = a.id; opt.innerText = a.nome; s.appendChild(opt);
+            });
+        });
+        conectarDeriv();
+    }
 
-function msgResultado(m, est, res, status) {
-    let emoji = res === 'WIN' ? '✅' : '❌';
-    let placar = `🟢 ${stats.winDireto + stats.winG1 + stats.winG2}W | 🔴 ${stats.loss}L`;
-    const texto = `${emoji} *RESULTADO: ${res === 'WIN' ? 'GREEN' : 'RED'}*\n\n🚦 Status: ${status}\n📊 Ativo: ${m.nome}\n📈 Placar: ${placar}`;
+    function addMsg(txt, type = '') {
+        const chat = document.getElementById('chat');
+        const div = document.createElement('div');
+        div.className = `bubble ${type}`;
+        div.innerHTML = `${txt}<span class="msg-time">${getH()}</span>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
 
-    enviarParaApp('sinal_app', {
-        tipo: 'RESULTADO',
-        resultado: res,
-        ativo: m.nome,
-        texto: texto
-    });
-}
+    function toggleConfig() {
+        const t = document.getElementById('config-tab');
+        if (t.style.display === 'block') {
+            t.style.display = 'none';
+            // Atualiza banca ao fechar ajustes
+            bancaInicial = parseFloat(document.getElementById('inpBanca').value);
+            bancaAtual = bancaInicial;
+            document.getElementById('banca-topo').innerText = `R$ ${bancaAtual.toFixed(2)}`;
+            conectarDeriv();
+        } else { t.style.display = 'block'; }
+    }
 
-// ... (Mantenha aqui todo o seu motor de análise WebSocket da Deriv que você já tem) ...
+    setInterval(() => {
+        const s = new Date().getSeconds();
+        document.getElementById('timer-box').innerText = (60-s).toString().padStart(2, '0') + "s";
+    }, 1000);
 
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+    // FUNÇÃO DO RELATÓRIO IDÊNTICA À IMAGEM
+    function enviarRelatorio() {
+        const total = wins + reds;
+        const wr = total > 0 ? ((wins / total) * 100).toFixed(0) : 0;
+        const lucroTotal = bancaAtual - bancaInicial;
+        const cresc = bancaInicial > 0 ? ((lucroTotal / bancaInicial) * 100).toFixed(2) : 0;
+        const estAtiva = document.getElementById('selEstrategia').value;
+
+        const relatorioFormatado = `🗓<b>Relatório KCM MASTER</b>\n\n` +
+            `🔎 Número de Análises: ${analises.toString().padStart(2, '0')}\n` +
+            `✋ Análises abortadas: ${abortadas.toString().padStart(2, '0')}\n` +
+            `♻️ win c/gale 1: ${winsG1.toString().padStart(2, '0')}\n` +
+            `♻️ win c/gale 2: ${winsG2.toString().padStart(2, '0')}\n` +
+            `🤑 Total geral Green: ${wins.toString().padStart(2, '0')}\n` +
+            `😡 Total geral Loos: ${reds.toString().padStart(2, '0')}\n\n` +
+            `🏆 Rank de ativos\n` +
+            `1° Lugar: ${estAtiva} / ${wr}%\n` +
+            `2° Lugar: -- / 00%\n` +
+            `3° Lugar: -- / 00%\n\n` +
+            `📈 Eficiência do bot: ${wr}%\n` +
+            `✅ Assertividade: ${wr}%\n` +
+            `💰 Banca inicial: ${bancaInicial.toFixed(2)}R$\n` +
+            `🤑 Lucro: ${lucroTotal.toFixed(2)}R$\n` +
+            `📊 Crescimento de: ${cresc}%`;
+
+        addMsg(relatorioFormatado);
+    }
+
+    function gerarPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("RELATORIO KCM MASTER", 10, 10);
+        doc.save("Relatorio_KCM.pdf");
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
