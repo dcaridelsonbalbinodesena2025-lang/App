@@ -9,83 +9,87 @@ app.use(cors());
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: "*" } });
 
-// 1. MAPEAMENTO DOS ATIVOS REAIS
-const ativosIniciais = {
-    "R_10": "Volatility 10 Index",
-    "R_100": "Volatility 100 Index",
-    "1HZ10V": "Volatility 10 (1s) Index",
-    "1HZ100V": "Volatility 100 (1s) Index"
-};
+const ATIVOS = { "R_10": "Volatility 10 Index", "1HZ10V": "Volatility 10 (1s) Index" };
 
-// 2. CONEXÃO COM A DERIV (DADOS REAIS)
-function conectarDeriv() {
-    Object.keys(ativosIniciais).forEach(symbol => {
+function iniciarMotorReal() {
+    Object.keys(ATIVOS).forEach(id => {
         const ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+        ws.on('open', () => ws.send(JSON.stringify({ ticks: id })));
 
-        ws.on('open', () => ws.send(JSON.stringify({ ticks: symbol })));
-
-        let historicoTicks = [];
+        let historico = [];
+        let operacaoEmCurso = false;
 
         ws.on('message', (data) => {
-            const msg = JSON.parse(data.toString());
-            if (!msg.tick) return;
+            const res = JSON.parse(data.toString());
+            if (!res.tick || operacaoEmCurso) return;
 
-            const preco = msg.tick.quote;
-            historicoTicks.push(preco);
-            if (historicoTicks.length > 20) historicoTicks.shift();
+            const precoAtual = res.tick.quote;
+            historico.push(precoAtual);
+            if (historico.length > 10) historico.shift();
 
-            // 3. LOGICA DE ANÁLISE (EX: ESTRATÉGIA DE FLUXO)
-            analisarSinal(symbol, historicoTicks);
+            // ESTRATÉGIA: 3 Ticks de força
+            if (historico.length >= 4) {
+                const u = historico[historico.length - 1];
+                const p = historico[historico.length - 2];
+                const a = historico[historico.length - 3];
+
+                let direcao = (u > p && p > a) ? "CALL" : (u < p && p < a) ? "PUT" : null;
+
+                if (direcao) {
+                    operacaoEmCurso = true;
+                    executarOperacaoReal(id, direcao, precoAtual);
+                    historico = [];
+                }
+            }
         });
-
-        ws.on('error', () => setTimeout(conectarDeriv, 5000)); // Reconectar se cair
     });
 }
 
-// 4. MOTOR DE ESTRATÉGIA E DISPARO PARA O APP
-function analisarSinal(id, ticks) {
-    if (ticks.length < 5) return;
+function executarOperacaoReal(idAtivo, direcao, taxaEntrada) {
+    const nome = ATIVOS[idAtivo];
+    const tempoExpiracao = 10000; // 10 Segundos para checar o resultado real
 
-    const ultimo = ticks[ticks.length - 1];
-    const penultimo = ticks[ticks.length - 2];
-    const antepenultimo = ticks[ticks.length - 3];
+    // 1. MANDA A ENTRADA
+    io.emit('sinal_app', { 
+        tipo: 'ENTRADA', 
+        texto: `🎯 **ENTRADA REAL**\nAtivo: ${nome}\nTaxa: ${taxaEntrada}\nDireção: ${direcao === "CALL" ? "COMPRA 🟢" : "VENDA 🔴"}` 
+    });
 
-    let direcao = null;
-    if (ultimo > penultimo && penultimo > antepenultimo) direcao = "CALL";
-    if (ultimo < penultimo && penultimo < antepenultimo) direcao = "PUT";
-
-    if (direcao) {
-        const nomeAtivo = ativosIniciais[id];
+    // 2. ESPERA O TEMPO DO GRÁFICO
+    setTimeout(() => {
+        // Conecta rápido para pegar o preço de fechamento real
+        const wsCheck = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+        wsCheck.on('open', () => wsCheck.send(JSON.stringify({ ticks: idAtivo })));
         
-        // FASE 1: Manda Alerta de Análise
-        io.emit('sinal_app', {
-            tipo: 'ALERTA',
-            texto: `🔎 **ANALISANDO MERCADO**\nAtivo: ${nomeAtivo}\nEstratégia: Fluxo Sniper`
-        });
+        wsCheck.on('message', (data) => {
+            const res = JSON.parse(data.toString());
+            if (res.tick) {
+                const taxaSaida = res.tick.quote;
+                wsCheck.terminate();
 
-        // FASE 2: Confirma Entrada após 2 segundos
-        setTimeout(() => {
-            io.emit('sinal_app', {
-                tipo: 'ENTRADA',
-                texto: `🎯 **ENTRADA CONFIRMADA**\nAtivo: ${nomeAtivo}\nDireção: ${direcao === "CALL" ? "COMPRA 🟢" : "VENDA 🔴"}`
-            });
+                // 3. COMPARAÇÃO MATEMÁTICA REAL
+                let ganhou = false;
+                if (direcao === "CALL" && taxaSaida > taxaEntrada) ganhou = true;
+                if (direcao === "PUT" && taxaSaida < taxaEntrada) ganhou = true;
 
-            // FASE 3: Resultado Real (Simulado pelo tempo de expiração)
-            setTimeout(() => {
-                const win = Math.random() > 0.4; // Aqui definimos o Win/Loss
-                io.emit('sinal_app', {
-                    tipo: 'RESULTADO',
-                    texto: win ? `✅ **GREEN NO ${nomeAtivo}**` : `❌ **LOSS NO ${nomeAtivo}**`,
-                    resultado: win ? 'WIN' : 'LOSS'
+                const resultado = ganhou ? 'WIN' : 'LOSS';
+                const emoji = ganhou ? '✅' : '❌';
+
+                // 4. ENVIA O RESULTADO BASEADO NO PREÇO, NÃO NA SORTE
+                io.emit('sinal_app', { 
+                    tipo: 'RESULTADO', 
+                    texto: `${emoji} **FECHAMENTO REAL**\nEntrada: ${taxaEntrada}\nSaída: ${taxaSaida}\nResultado: ${resultado}`,
+                    resultado: resultado 
                 });
-            }, 10000); // 10 segundos para sair o resultado
-        }, 2000);
 
-        ticks.length = 0; // Limpa para não repetir sinal no mesmo movimento
-    }
+                // Libera para a próxima análise após 5 segundos
+                setTimeout(() => { operacaoEmCurso = false; }, 5000);
+            }
+        });
+    }, tempoExpiracao);
 }
 
 server.listen(process.env.PORT || 3000, () => {
-    console.log("🚀 Motor de Sinais KCM Master Iniciado");
-    conectarDeriv();
+    console.log("🚀 SISTEMA 100% REAL INICIADO");
+    iniciarMotorReal();
 });
